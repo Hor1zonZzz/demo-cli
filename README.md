@@ -4,13 +4,23 @@ A command-line AI assistant with file operation tools.
 
 ## Installation
 
-### From GitHub (recommended)
+### Using uv (recommended)
+
+```bash
+# Install uv if you don't have it
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install demo-cli
+uv tool install git+https://github.com/Hor1zonZzz/demo-cli.git
+```
+
+### Using pipx
 
 ```bash
 pipx install git+https://github.com/Hor1zonZzz/demo-cli.git
 ```
 
-Or with pip:
+### Using pip
 
 ```bash
 pip install git+https://github.com/Hor1zonZzz/demo-cli.git
@@ -21,7 +31,21 @@ pip install git+https://github.com/Hor1zonZzz/demo-cli.git
 ```bash
 git clone https://github.com/Hor1zonZzz/demo-cli.git
 cd demo-cli
-pip install -e .
+uv sync
+uv run demo-cli
+```
+
+## Uninstall
+
+```bash
+# If installed with uv
+uv tool uninstall demo-cli
+
+# If installed with pipx
+pipx uninstall demo-cli
+
+# If installed with pip
+pip uninstall demo-cli
 ```
 
 ## Configuration
