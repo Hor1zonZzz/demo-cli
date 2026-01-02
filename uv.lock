@@ -300,7 +300,7 @@ wheels = [
 [[package]]
 name = "demo-cli"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "openai" },
     { name = "openai-agents", extra = ["litellm"] },
