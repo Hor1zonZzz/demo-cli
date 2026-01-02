@@ -1,6 +1,8 @@
 """Main CLI application."""
 
 from prompt_toolkit import PromptSession
+from prompt_toolkit.filters import Condition
+from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.styles import Style
 from rich.console import Console
 from rich.markdown import Markdown
@@ -36,7 +38,25 @@ class App:
         self.console = Console(theme=_theme)
         self.session_manager = SessionManager()
         self.ctx = CommandContext(self.session_manager, self.console)
-        self.prompt_session = PromptSession(style=_prompt_style)
+        self._selected_command: str | None = None
+
+        # Key bindings for instant "/" menu
+        kb = KeyBindings()
+
+        @kb.add("/", filter=Condition(lambda: True))
+        def _(event):
+            # Show menu immediately when "/" is pressed on empty input
+            if not event.app.current_buffer.text:
+                selected = show_command_menu()
+                if selected:
+                    self._selected_command = selected
+                    event.app.current_buffer.text = selected
+                    event.app.current_buffer.validate_and_handle()
+            else:
+                # Normal "/" input if there's already text
+                event.app.current_buffer.insert_text("/")
+
+        self.prompt_session = PromptSession(style=_prompt_style, key_bindings=kb)
 
     def _show_welcome(self) -> None:
         """Display welcome message."""
@@ -93,14 +113,6 @@ class App:
 
                 if not user_input:
                     continue
-
-                # Show command menu when just "/" is entered
-                if user_input == "/":
-                    selected = show_command_menu()
-                    if selected:
-                        user_input = selected
-                    else:
-                        continue
 
                 if user_input.startswith("/"):
                     should_exit = await self._handle_command(user_input)
