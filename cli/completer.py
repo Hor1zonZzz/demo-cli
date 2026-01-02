@@ -1,22 +1,33 @@
-"""Command completer and auto-suggest for prompt_toolkit."""
+"""Command completer for prompt_toolkit."""
 
-from prompt_toolkit.auto_suggest import AutoSuggest, Suggestion
+from prompt_toolkit.completion import Completer, Completion
 
 from cli.commands import registry
 
 
-class SlashCommandSuggest(AutoSuggest):
-    """Auto-suggest for slash commands (inline gray hint)."""
+class SlashCommandCompleter(Completer):
+    """Completer for slash commands with styled dropdown menu."""
 
-    def get_suggestion(self, buffer, document):
-        text = document.text
+    def get_completions(self, document, complete_event):
+        text = document.text_before_cursor
 
-        if text.startswith("/"):
-            partial = text.lower()
-
+        # Show all commands when just "/" is typed
+        if text == "/":
             for cmd in registry.all():
-                if cmd.name.startswith(partial) and cmd.name != partial:
-                    # Return the remaining part as suggestion
-                    return Suggestion(cmd.name[len(text):])
-
-        return None
+                yield Completion(
+                    cmd.name,
+                    start_position=-1,
+                    display=cmd.name,
+                    display_meta=cmd.description,
+                )
+        # Filter commands as user types more
+        elif text.startswith("/"):
+            partial = text.lower()
+            for cmd in registry.all():
+                if cmd.name.startswith(partial):
+                    yield Completion(
+                        cmd.name,
+                        start_position=-len(text),
+                        display=cmd.name,
+                        display_meta=cmd.description,
+                    )

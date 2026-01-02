@@ -9,7 +9,7 @@ from rich.theme import Theme
 from agents import Runner
 
 from cli.commands import registry, CommandContext
-from cli.completer import SlashCommandSuggest
+from cli.completer import SlashCommandCompleter
 from cli_agents.assistant import create_assistant
 from sessions import SessionManager
 
@@ -23,10 +23,21 @@ _theme = Theme({
     "dim": "dim white",
 })
 
-# Prompt style
+# Prompt style - Claude Code inspired
 _prompt_style = Style.from_dict({
-    "prompt": "bold #7aa2f7",
-    "auto-suggestion": "#565f89",  # Gray inline hint
+    # Prompt
+    "prompt": "bold #c4a7e7",
+    # Completion menu
+    "completion-menu": "bg:#232136 #e0def4",
+    "completion-menu.completion": "bg:#232136 #e0def4",
+    "completion-menu.completion.current": "bg:#44415a #c4a7e7 bold",
+    # Meta (description)
+    "completion-menu.meta": "bg:#232136 #6e6a86",
+    "completion-menu.meta.completion": "bg:#232136 #6e6a86",
+    "completion-menu.meta.completion.current": "bg:#44415a #9ccfd8",
+    # Scrollbar
+    "scrollbar.background": "bg:#232136",
+    "scrollbar.button": "bg:#44415a",
 })
 
 
@@ -38,8 +49,9 @@ class App:
         self.session_manager = SessionManager()
         self.ctx = CommandContext(self.session_manager, self.console)
         self.prompt_session = PromptSession(
-            auto_suggest=SlashCommandSuggest(),
+            completer=SlashCommandCompleter(),
             style=_prompt_style,
+            complete_while_typing=True,
         )
 
     def _show_welcome(self) -> None:
