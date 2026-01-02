@@ -9,7 +9,7 @@ from rich.theme import Theme
 from agents import Runner
 
 from cli.commands import registry, CommandContext
-from cli.completer import SlashCommandCompleter
+from cli.completer import show_command_menu
 from cli_agents.assistant import create_assistant
 from sessions import SessionManager
 
@@ -23,21 +23,9 @@ _theme = Theme({
     "dim": "dim white",
 })
 
-# Prompt style - Claude Code inspired
+# Prompt style
 _prompt_style = Style.from_dict({
-    # Prompt
     "prompt": "bold #c4a7e7",
-    # Completion menu
-    "completion-menu": "bg:#232136 #e0def4",
-    "completion-menu.completion": "bg:#232136 #e0def4",
-    "completion-menu.completion.current": "bg:#44415a #c4a7e7 bold",
-    # Meta (description)
-    "completion-menu.meta": "bg:#232136 #6e6a86",
-    "completion-menu.meta.completion": "bg:#232136 #6e6a86",
-    "completion-menu.meta.completion.current": "bg:#44415a #9ccfd8",
-    # Scrollbar
-    "scrollbar.background": "bg:#232136",
-    "scrollbar.button": "bg:#44415a",
 })
 
 
@@ -48,18 +36,14 @@ class App:
         self.console = Console(theme=_theme)
         self.session_manager = SessionManager()
         self.ctx = CommandContext(self.session_manager, self.console)
-        self.prompt_session = PromptSession(
-            completer=SlashCommandCompleter(),
-            style=_prompt_style,
-            complete_while_typing=True,
-        )
+        self.prompt_session = PromptSession(style=_prompt_style)
 
     def _show_welcome(self) -> None:
         """Display welcome message."""
         session_id = self.session_manager.get_current_session_id()
         self.console.print()
         self.console.print("[bold]Demo CLI Agent[/bold]")
-        self.console.print(f"[dim]会话: {session_id} | 输入 /help 查看帮助[/dim]")
+        self.console.print(f"[dim]会话: {session_id} | 输入 / 打开命令菜单[/dim]")
 
     async def _run_agent(self, user_input: str) -> str:
         """Run the agent with user input."""
@@ -77,7 +61,7 @@ class App:
             return result == "exit"
         else:
             self.console.print(f"[warning]未知命令: {user_input}[/warning]")
-            self.console.print("[dim]输入 /help 查看可用命令[/dim]")
+            self.console.print("[dim]输入 / 打开命令菜单[/dim]")
             return False
 
     async def _handle_chat(self, user_input: str) -> None:
@@ -109,6 +93,14 @@ class App:
 
                 if not user_input:
                     continue
+
+                # Show command menu when just "/" is entered
+                if user_input == "/":
+                    selected = show_command_menu()
+                    if selected:
+                        user_input = selected
+                    else:
+                        continue
 
                 if user_input.startswith("/"):
                     should_exit = await self._handle_command(user_input)

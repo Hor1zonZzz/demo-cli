@@ -1,33 +1,30 @@
-"""Command completer for prompt_toolkit."""
+"""Command selector using simple-term-menu."""
 
-from prompt_toolkit.completion import Completer, Completion
+from simple_term_menu import TerminalMenu
 
 from cli.commands import registry
 
 
-class SlashCommandCompleter(Completer):
-    """Completer for slash commands with styled dropdown menu."""
+def show_command_menu() -> str | None:
+    """Show interactive command menu and return selected command."""
+    commands = registry.all()
 
-    def get_completions(self, document, complete_event):
-        text = document.text_before_cursor
+    # Format: "/help  显示帮助信息"
+    menu_entries = [f"{cmd.name}  [dim]{cmd.description}[/dim]" for cmd in commands]
 
-        # Show all commands when just "/" is typed
-        if text == "/":
-            for cmd in registry.all():
-                yield Completion(
-                    cmd.name,
-                    start_position=-1,
-                    display=cmd.name,
-                    display_meta=cmd.description,
-                )
-        # Filter commands as user types more
-        elif text.startswith("/"):
-            partial = text.lower()
-            for cmd in registry.all():
-                if cmd.name.startswith(partial):
-                    yield Completion(
-                        cmd.name,
-                        start_position=-len(text),
-                        display=cmd.name,
-                        display_meta=cmd.description,
-                    )
+    menu = TerminalMenu(
+        menu_entries,
+        title="Commands",
+        menu_cursor="❯ ",
+        menu_cursor_style=("fg_purple", "bold"),
+        menu_highlight_style=("fg_purple", "bold"),
+        search_key=None,  # Disable search, let user type to filter
+        cycle_cursor=True,
+        clear_screen=False,
+    )
+
+    choice = menu.show()
+
+    if choice is not None:
+        return commands[choice].name
+    return None
