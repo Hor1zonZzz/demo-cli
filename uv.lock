@@ -306,6 +306,7 @@ dependencies = [
     { name = "openai-agents", extra = ["litellm"] },
     { name = "prompt-toolkit" },
     { name = "python-dotenv" },
+    { name = "pyyaml" },
     { name = "rich" },
     { name = "simple-term-menu" },
 ]
@@ -316,6 +317,7 @@ requires-dist = [
     { name = "openai-agents", extras = ["litellm"], specifier = ">=0.6.4" },
     { name = "prompt-toolkit", specifier = ">=3.0.52" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "rich", specifier = ">=14.2.0" },
     { name = "simple-term-menu", specifier = ">=1.6.6" },
 ]

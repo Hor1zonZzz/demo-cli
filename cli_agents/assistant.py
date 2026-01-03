@@ -22,18 +22,23 @@ ASSISTANT_INSTRUCTIONS = """你是一个有帮助的命令行助手。你可以�
 请用简洁友好的方式回复用户。"""
 
 
-def create_assistant(model: str = "deepseek-chat") -> Agent:
+def create_assistant(
+    model: str = "deepseek-chat", enhanced_instructions: str | None = None
+) -> Agent:
     """Create the CLI assistant agent.
 
     Args:
         model: The model to use for the agent.
+        enhanced_instructions: Optional enhanced instructions with skills injected.
 
     Returns:
         The configured Agent instance.
     """
+    instructions = enhanced_instructions or ASSISTANT_INSTRUCTIONS
+
     return Agent(
         name="CLI Assistant",
-        instructions=ASSISTANT_INSTRUCTIONS,
+        instructions=instructions,
         model=model,
         tools=[
             read_file,

@@ -12,8 +12,9 @@ from agents import Runner
 
 from cli.commands import registry, CommandContext
 from cli.completer import show_command_menu
-from cli_agents.assistant import create_assistant
+from cli_agents.assistant import create_assistant, ASSISTANT_INSTRUCTIONS
 from sessions import SessionManager
+from skills import SkillScanner, SkillLoader, SkillMatcher, SkillInjector
 
 
 # Theme
@@ -40,6 +41,13 @@ class App:
         self.ctx = CommandContext(self.session_manager, self.console)
         self._selected_command: str | None = None
 
+        # Skills progressive loading (Level 1: Metadata)
+        self.skill_scanner = SkillScanner()
+        self.skill_loader = SkillLoader()
+        self.skill_matcher = SkillMatcher()
+        self.skill_injector = SkillInjector()
+        self.available_skills = self.skill_scanner.scan_skills_directory()
+
         # Key bindings for instant "/" menu
         kb = KeyBindings()
 
@@ -65,9 +73,43 @@ class App:
         self.console.print("[bold]Demo CLI Agent[/bold]")
         self.console.print(f"[dim]会话: {session_id} | 输入 / 打开命令菜单[/dim]")
 
+        # Show loaded skills
+        if self.available_skills:
+            skill_names = [s.name for s in self.available_skills]
+            self.console.print(f"[dim]已加载 {len(self.available_skills)} 个 Skills: {', '.join(skill_names)}[/dim]")
+
     async def _run_agent(self, user_input: str) -> str:
         """Run the agent with user input."""
-        agent = create_assistant()
+        # Level 2: Match and load relevant skills
+        matched_skills = self.skill_matcher.match_skills(user_input, self.available_skills)
+
+        # Build enhanced instructions
+        enhanced_instructions = ASSISTANT_INSTRUCTIONS
+
+        # Always inject Level 1 metadata summary
+        if self.available_skills:
+            enhanced_instructions = self.skill_injector.inject_metadata_summary(
+                enhanced_instructions, self.available_skills
+            )
+
+        # Inject Level 2 full instructions for matched skills
+        if matched_skills:
+            skills_with_content = []
+            for skill_meta in matched_skills:
+                skill_content = self.skill_loader.load_skill_instructions(skill_meta)
+                if skill_content:
+                    skills_with_content.append((skill_meta, skill_content))
+
+            if skills_with_content:
+                enhanced_instructions = self.skill_injector.inject_multiple_skills(
+                    enhanced_instructions, skills_with_content
+                )
+                # Show which skills were activated
+                activated_names = [s[0].name for s in skills_with_content]
+                self.console.print(f"[dim]🔧 激活 Skills: {', '.join(activated_names)}[/dim]")
+
+        # Create agent with enhanced instructions
+        agent = create_assistant(enhanced_instructions=enhanced_instructions)
         messages = self.session_manager.get_messages()
         messages.append({"role": "user", "content": user_input})
         result = await Runner.run(agent, messages)
