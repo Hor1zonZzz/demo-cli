@@ -20,6 +20,8 @@ demo-cli/
 ├── main.py                 # Entry point and DeepSeek client setup
 ├── pyproject.toml          # Project configuration and dependencies
 ├── README.md               # User-facing documentation
+├── demo.mcp.json          # MCP server configuration (optional)
+├── demo.mcp.json.example  # Example MCP configuration
 ├── cli/                    # CLI interface layer
 │   ├── __init__.py        # Exports App class
 │   ├── app.py             # Main application loop and UI logic
@@ -28,6 +30,9 @@ demo-cli/
 ├── cli_agents/            # Agent definitions
 │   ├── __init__.py
 │   └── assistant.py       # CLI assistant agent configuration
+├── mcp/                   # MCP integration
+│   ├── __init__.py        # Exports MCPManager
+│   └── manager.py         # MCP configuration and server management
 ├── sessions/              # Session management
 │   ├── __init__.py
 │   └── manager.py         # SessionManager class for persistence
@@ -35,6 +40,158 @@ demo-cli/
     ├── __init__.py        # Tool exports
     └── file_tools.py      # File operation tools (sandboxed)
 ```
+
+## MCP (Model Context Protocol) Integration
+
+Demo CLI supports the Model Context Protocol, allowing you to extend the agent's capabilities with external MCP servers. MCP enables standardized integration with various tools and services.
+
+### Configuration File Format
+
+Create a `demo.mcp.json` file in your working directory:
+
+```json
+{
+  "mcpServers": [
+    {
+      "name": "Filesystem MCP",
+      "type": "stdio",
+      "enabled": true,
+      "params": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+      },
+      "description": "File system access tools"
+    }
+  ]
+}
+```
+
+### Supported MCP Server Types
+
+1. **Stdio MCP Servers** (recommended for local tools)
+```json
+{
+  "type": "stdio",
+  "params": {
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-fetch"],
+    "env": {
+      "CUSTOM_VAR": "value"
+    }
+  }
+}
+```
+
+2. **HTTP MCP Servers** (for remote services)
+```json
+{
+  "type": "http",
+  "params": {
+    "url": "http://localhost:8000/mcp",
+    "headers": {
+      "Authorization": "Bearer token"
+    },
+    "timeout": 30
+  }
+}
+```
+
+3. **SSE MCP Servers** (Server-Sent Events)
+```json
+{
+  "type": "sse",
+  "params": {
+    "url": "http://localhost:3000/sse",
+    "headers": {
+      "X-API-Key": "your_key"
+    }
+  }
+}
+```
+
+### Available MCP Servers
+
+Common MCP servers you can use:
+
+- **@modelcontextprotocol/server-filesystem**: File operations
+- **@modelcontextprotocol/server-fetch**: HTTP requests
+- **@modelcontextprotocol/server-github**: GitHub API integration
+- **@modelcontextprotocol/server-slack**: Slack messaging
+- **@modelcontextprotocol/server-postgres**: PostgreSQL database access
+- **@modelcontextprotocol/server-brave-search**: Web search
+
+### MCP Lifecycle
+
+The MCP integration follows this lifecycle:
+
+1. **Initialization**: On app startup, `MCPManager` reads `demo.mcp.json`
+2. **Server Creation**: Each enabled server is initialized based on its type
+3. **Agent Attachment**: MCP servers are attached to the agent instance
+4. **Tool Access**: Agent can use MCP-provided tools alongside built-in tools
+5. **Cleanup**: Servers are properly closed when app exits
+
+### MCP Manager API
+
+The `MCPManager` class (`mcp/manager.py`) provides:
+
+```python
+from mcp import MCPManager
+
+manager = MCPManager("demo.mcp.json")
+
+# Load configuration
+manager.load_config()
+
+# Get server configs
+configs = manager.get_server_configs()
+
+# Initialize all servers
+servers = await manager.initialize_all_servers()
+
+# Cleanup on exit
+await manager.cleanup_servers()
+```
+
+### Integration with Agent
+
+In `cli_agents/assistant.py`, MCP servers are passed to the agent:
+
+```python
+def create_assistant(
+    model: str = "deepseek-chat",
+    mcp_servers: list[Any] | None = None
+) -> Agent:
+    agent_config = {
+        "name": "CLI Assistant",
+        "model": model,
+        "tools": [read_file, write_file, ...],
+    }
+
+    if mcp_servers:
+        agent_config["mcp_servers"] = mcp_servers
+
+    return Agent(**agent_config)
+```
+
+### Enabling/Disabling MCP Servers
+
+Control MCP servers via the `enabled` field:
+
+```json
+{
+  "name": "GitHub MCP",
+  "enabled": false,  // Disabled
+  "type": "stdio",
+  ...
+}
+```
+
+### MCP Security Considerations
+
+- **Environment Variables**: Store sensitive tokens in `env` params
+- **Network Access**: HTTP/SSE servers can access external services
+- **Tool Approval**: Consider implementing approval workflows for sensitive operations
+- **Sandboxing**: MCP servers may have broader access than built-in tools
 
 ## Key Architecture Patterns
 
@@ -762,6 +919,8 @@ When working on this codebase:
 - Tools: `tools/file_tools.py`
 - Commands: `cli/commands.py`
 - Sessions: `sessions/manager.py`
+- MCP manager: `mcp/manager.py`
+- MCP config: `demo.mcp.json` (optional)
 - Config: `pyproject.toml`
 
 ### Key Functions
@@ -780,11 +939,13 @@ from cli import App
 from tools import read_file, write_file, list_directory
 from cli.commands import registry, CommandContext
 from cli_agents.assistant import create_assistant
+from mcp import MCPManager
 from sessions import SessionManager
 ```
 
 ---
 
-**Document Version**: 1.0
+**Document Version**: 1.1
 **Last Updated**: 2026-01-03
 **Maintainer**: Demo CLI Project
+**Recent Changes**: Added MCP (Model Context Protocol) integration support

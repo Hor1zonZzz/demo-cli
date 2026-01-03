@@ -1,5 +1,7 @@
 """CLI Assistant agent definition."""
 
+from typing import Any
+
 from agents import Agent
 
 from tools import read_file, write_file, list_directory, delete_file, file_exists
@@ -19,27 +21,37 @@ ASSISTANT_INSTRUCTIONS = """你是一个有帮助的命令行助手。你可以�
 2. 在执行删除操作前，请先确认用户的意图
 3. 如果用户的请求不明确，请询问更多细节
 
+如果你通过 MCP 服务器获得了额外的工具，请充分利用这些工具来帮助用户。
+
 请用简洁友好的方式回复用户。"""
 
 
-def create_assistant(model: str = "deepseek-chat") -> Agent:
+def create_assistant(
+    model: str = "deepseek-chat", mcp_servers: list[Any] | None = None
+) -> Agent:
     """Create the CLI assistant agent.
 
     Args:
         model: The model to use for the agent.
+        mcp_servers: Optional list of MCP servers to connect to the agent.
 
     Returns:
         The configured Agent instance.
     """
-    return Agent(
-        name="CLI Assistant",
-        instructions=ASSISTANT_INSTRUCTIONS,
-        model=model,
-        tools=[
+    agent_config = {
+        "name": "CLI Assistant",
+        "instructions": ASSISTANT_INSTRUCTIONS,
+        "model": model,
+        "tools": [
             read_file,
             write_file,
             list_directory,
             delete_file,
             file_exists,
         ],
-    )
+    }
+
+    if mcp_servers:
+        agent_config["mcp_servers"] = mcp_servers
+
+    return Agent(**agent_config)

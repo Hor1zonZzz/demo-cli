@@ -13,6 +13,7 @@ from agents import Runner
 from cli.commands import registry, CommandContext
 from cli.completer import show_command_menu
 from cli_agents.assistant import create_assistant
+from mcp import MCPManager
 from sessions import SessionManager
 
 
@@ -37,8 +38,10 @@ class App:
     def __init__(self):
         self.console = Console(theme=_theme)
         self.session_manager = SessionManager()
+        self.mcp_manager = MCPManager()
         self.ctx = CommandContext(self.session_manager, self.console)
         self._selected_command: str | None = None
+        self._mcp_servers: list = []
 
         # Key bindings for instant "/" menu
         kb = KeyBindings()
@@ -65,9 +68,16 @@ class App:
         self.console.print("[bold]Demo CLI Agent[/bold]")
         self.console.print(f"[dim]会话: {session_id} | 输入 / 打开命令菜单[/dim]")
 
+        # Show MCP servers if enabled
+        if self._mcp_servers:
+            server_names = self.mcp_manager.get_enabled_server_names()
+            self.console.print(
+                f"[dim]MCP 服务器: {', '.join(server_names)}[/dim]"
+            )
+
     async def _run_agent(self, user_input: str) -> str:
         """Run the agent with user input."""
-        agent = create_assistant()
+        agent = create_assistant(mcp_servers=self._mcp_servers if self._mcp_servers else None)
         messages = self.session_manager.get_messages()
         messages.append({"role": "user", "content": user_input})
         result = await Runner.run(agent, messages)
@@ -98,34 +108,63 @@ class App:
 
     async def run(self) -> None:
         """Run the main loop."""
+        # Load session
         if not self.session_manager.load_latest_session():
             self.session_manager.create_session()
 
+        # Initialize MCP servers
+        await self._initialize_mcp_servers()
+
         self._show_welcome()
 
-        while True:
+        try:
+            while True:
+                try:
+                    self.console.print()
+                    user_input = await self.prompt_session.prompt_async(
+                        [("class:prompt", "> ")],
+                    )
+                    user_input = user_input.strip()
+
+                    if not user_input:
+                        continue
+
+                    if user_input.startswith("/"):
+                        should_exit = await self._handle_command(user_input)
+                        if should_exit:
+                            break
+                    else:
+                        await self._handle_chat(user_input)
+
+                except KeyboardInterrupt:
+                    self.console.print("\n[dim]再见![/dim]")
+                    break
+                except EOFError:
+                    self.console.print("\n[dim]再见![/dim]")
+                    break
+                except Exception as e:
+                    self.console.print(f"[error]错误: {e}[/error]")
+        finally:
+            # Cleanup MCP servers on exit
+            await self._cleanup_mcp_servers()
+
+    async def _initialize_mcp_servers(self) -> None:
+        """Initialize MCP servers from configuration file."""
+        if self.mcp_manager.load_config():
+            self.console.print("[dim]正在加载 MCP 配置...[/dim]")
             try:
-                self.console.print()
-                user_input = await self.prompt_session.prompt_async(
-                    [("class:prompt", "> ")],
-                )
-                user_input = user_input.strip()
-
-                if not user_input:
-                    continue
-
-                if user_input.startswith("/"):
-                    should_exit = await self._handle_command(user_input)
-                    if should_exit:
-                        break
-                else:
-                    await self._handle_chat(user_input)
-
-            except KeyboardInterrupt:
-                self.console.print("\n[dim]再见![/dim]")
-                break
-            except EOFError:
-                self.console.print("\n[dim]再见![/dim]")
-                break
+                self._mcp_servers = await self.mcp_manager.initialize_all_servers()
+                if self._mcp_servers:
+                    server_count = len(self._mcp_servers)
+                    self.console.print(
+                        f"[success]成功加载 {server_count} 个 MCP 服务器[/success]"
+                    )
             except Exception as e:
-                self.console.print(f"[error]错误: {e}[/error]")
+                self.console.print(f"[warning]MCP 服务器初始化失败: {e}[/warning]")
+                self._mcp_servers = []
+
+    async def _cleanup_mcp_servers(self) -> None:
+        """Cleanup MCP servers."""
+        if self._mcp_servers:
+            await self.mcp_manager.cleanup_servers()
+            self._mcp_servers = []
