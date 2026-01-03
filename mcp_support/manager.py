@@ -1,10 +1,13 @@
 """MCP configuration manager for loading and managing MCP servers."""
 
 import json
+import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from agents.mcp import MCPServerStdio, MCPServerStreamableHttp, MCPServerSse
+
+logger = logging.getLogger(__name__)
 
 
 class MCPManager:
@@ -44,7 +47,7 @@ class MCPManager:
         """
         return self.config.get("mcpServers", [])
 
-    async def initialize_server(self, server_config: dict[str, Any]) -> Optional[Any]:
+    async def initialize_server(self, server_config: dict[str, Any]) -> Any | None:
         """Initialize a single MCP server based on configuration.
 
         Args:
@@ -68,10 +71,10 @@ class MCPManager:
             elif server_type == "sse":
                 return await self._create_sse_server(name, server_config)
             else:
-                print(f"警告: 未知的 MCP 服务器类型: {server_type}")
+                logger.warning(f"未知的 MCP 服务器类型: {server_type}")
                 return None
         except Exception as e:
-            print(f"错误: 初始化 MCP 服务器 '{name}' 失败: {e}")
+            logger.error(f"初始化 MCP 服务器 '{name}' 失败: {e}")
             return None
 
     async def _create_stdio_server(
@@ -95,7 +98,12 @@ class MCPManager:
         if env:
             server_params["env"] = env
 
-        server = MCPServerStdio(name=name, params=server_params)
+        # Use longer timeout for first run (npx may need to download packages)
+        server = MCPServerStdio(
+            name=name,
+            params=server_params,
+            client_session_timeout_seconds=30,
+        )
         await server.__aenter__()
         return server
 
@@ -173,7 +181,7 @@ class MCPManager:
             try:
                 await server.__aexit__(None, None, None)
             except Exception as e:
-                print(f"警告: 清理 MCP 服务器时出错: {e}")
+                logger.warning(f"清理 MCP 服务器时出错: {e}")
         self.servers = []
 
     def get_enabled_server_names(self) -> list[str]:

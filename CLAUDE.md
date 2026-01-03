@@ -30,7 +30,7 @@ demo-cli/
 ├── cli_agents/            # Agent definitions
 │   ├── __init__.py
 │   └── assistant.py       # CLI assistant agent configuration
-├── mcp/                   # MCP integration
+├── mcp_support/           # MCP integration
 │   ├── __init__.py        # Exports MCPManager
 │   └── manager.py         # MCP configuration and server management
 ├── sessions/              # Session management
@@ -132,10 +132,10 @@ The MCP integration follows this lifecycle:
 
 ### MCP Manager API
 
-The `MCPManager` class (`mcp/manager.py`) provides:
+The `MCPManager` class (`mcp_support/manager.py`) provides:
 
 ```python
-from mcp import MCPManager
+from mcp_support import MCPManager
 
 manager = MCPManager("demo.mcp.json")
 
@@ -919,7 +919,7 @@ When working on this codebase:
 - Tools: `tools/file_tools.py`
 - Commands: `cli/commands.py`
 - Sessions: `sessions/manager.py`
-- MCP manager: `mcp/manager.py`
+- MCP manager: `mcp_support/manager.py`
 - MCP config: `demo.mcp.json` (optional)
 - Config: `pyproject.toml`
 
@@ -939,7 +939,7 @@ from cli import App
 from tools import read_file, write_file, list_directory
 from cli.commands import registry, CommandContext
 from cli_agents.assistant import create_assistant
-from mcp import MCPManager
+from mcp_support import MCPManager
 from sessions import SessionManager
 ```
 

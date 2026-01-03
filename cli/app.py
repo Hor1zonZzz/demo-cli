@@ -13,7 +13,7 @@ from agents import Runner
 from cli.commands import registry, CommandContext
 from cli.completer import show_command_menu
 from cli_agents.assistant import create_assistant
-from mcp import MCPManager
+from mcp_support import MCPManager
 from sessions import SessionManager
 
 

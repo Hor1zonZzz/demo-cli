@@ -1,5 +1,5 @@
 """MCP (Model Context Protocol) integration module."""
 
-from mcp.manager import MCPManager
+from mcp_support.manager import MCPManager
 
 __all__ = ["MCPManager"]
