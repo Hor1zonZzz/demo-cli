@@ -56,6 +56,18 @@ Create a `.env` file in your home directory or current directory:
 DEEPSEEK_API_KEY=your_api_key_here
 ```
 
+Optional configuration:
+
+```bash
+# Model selection
+MODEL_NAME=deepseek-chat
+
+# Context compression
+MODEL_MAX_CONTEXT_TOKENS=4096
+CONTEXT_COMPRESSION_THRESHOLD=0.8
+CONTEXT_COMPRESSION_KEEP_LAST_MESSAGES=6
+```
+
 ## Usage
 
 After installation, run from any directory:

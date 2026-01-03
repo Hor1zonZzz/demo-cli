@@ -13,7 +13,9 @@ from agents import Runner
 from cli.commands import registry, CommandContext
 from cli.completer import show_command_menu
 from cli_agents.assistant import create_assistant
+from config import AppConfig
 from mcp_support import MCPManager
+from sessions.compression import CompressionSettings, ContextCompressor
 from sessions import SessionManager
 from tools.file_tools import set_mcp_tools
 
@@ -40,6 +42,15 @@ class App:
         self.console = Console(theme=_theme)
         self.session_manager = SessionManager()
         self.mcp_manager = MCPManager()
+        self.config = AppConfig.from_env()
+        self.context_compressor = ContextCompressor(
+            CompressionSettings(
+                model=self.config.model_name,
+                max_context_tokens=self.config.model_max_context_tokens,
+                threshold=self.config.context_compression_threshold,
+                keep_last_messages=self.config.context_compression_keep_last_messages,
+            )
+        )
         self._selected_command: str | None = None
         self._mcp_servers: list = []
         self._mcp_tools: list = []  # Cached MCP tools for /tools command
@@ -77,13 +88,22 @@ class App:
                 f"[dim]MCP 服务器: {', '.join(server_names)}[/dim]"
             )
 
-    async def _run_agent(self, user_input: str) -> str:
+    async def _run_agent(self, user_input: str) -> tuple[str, int | None]:
         """Run the agent with user input."""
-        agent = create_assistant(mcp_servers=self._mcp_servers if self._mcp_servers else None)
+        agent = create_assistant(
+            model=self.config.model_name,
+            mcp_servers=self._mcp_servers if self._mcp_servers else None,
+        )
         messages = self.session_manager.get_messages()
-        messages.append({"role": "user", "content": user_input})
+        if (
+            not messages
+            or messages[-1].get("role") != "user"
+            or messages[-1].get("content") != user_input
+        ):
+            messages.append({"role": "user", "content": user_input})
         result = await Runner.run(agent, messages)
-        return result.final_output
+        prompt_tokens = self.context_compressor.extract_prompt_tokens(result)
+        return result.final_output, prompt_tokens
 
     async def _handle_command(self, user_input: str) -> bool:
         """Handle a slash command. Returns True if should exit."""
@@ -101,12 +121,15 @@ class App:
         self.session_manager.save_message("user", user_input)
 
         with self.console.status("[cyan]思考中...[/cyan]", spinner="dots"):
-            response = await self._run_agent(user_input)
+            response, prompt_tokens = await self._run_agent(user_input)
 
         self.session_manager.save_message("assistant", response)
+        if prompt_tokens is not None:
+            self.session_manager.set_last_prompt_tokens(prompt_tokens)
         self.console.print()
         self.console.print("[bold]Assistant:[/bold]")
         self.console.print(Markdown(response))
+        await self._maybe_compress_context()
 
     async def run(self) -> None:
         """Run the main loop."""
@@ -178,3 +201,13 @@ class App:
         if self._mcp_servers:
             await self.mcp_manager.cleanup_servers()
             self._mcp_servers.clear()  # Use clear to keep list reference
+
+    async def _maybe_compress_context(self) -> None:
+        prompt_tokens = self.session_manager.get_last_prompt_tokens()
+        if not self.context_compressor.should_compress(prompt_tokens):
+            return
+        try:
+            await self.context_compressor.compress(self.session_manager)
+        except Exception:
+            # Best-effort compression: avoid interrupting the chat flow.
+            return
