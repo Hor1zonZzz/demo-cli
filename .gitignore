@@ -15,3 +15,6 @@ data/
 # Tool generated
 .ace-tool/
 .agent/
+
+# Local MCP demo test
+tests/test_mcp_demo.py
