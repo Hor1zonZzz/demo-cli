@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-from agents import function_tool
+from .registry import registry
 
 
 def _is_safe_path(path: str, base_dir: Path) -> bool:
@@ -26,48 +26,8 @@ def _is_safe_path(path: str, base_dir: Path) -> bool:
 # Get the working directory (project root)
 WORKING_DIR = Path.cwd()
 
-BUILTIN_TOOL_DESCRIPTIONS = [
-    ("read_file", "读取文件内容"),
-    ("write_file", "写入/创建文件"),
-    ("list_directory", "列出目录内容"),
-    ("delete_file", "删除文件"),
-    ("file_exists", "检查文件是否存在"),
-    ("list_tools", "列出当前可用工具"),
-]
 
-_MCP_TOOLS: list[tuple[str, str, str]] = []
-
-
-def set_mcp_tools(tools: list[tuple[str, str, str]]) -> None:
-    """Cache MCP tool metadata for list_tools."""
-    global _MCP_TOOLS
-    _MCP_TOOLS = list(tools)
-
-
-def _format_mcp_tools() -> list[str]:
-    if not _MCP_TOOLS:
-        return ["", "MCP 工具: 无"]
-
-    lines = ["", "MCP 工具:"]
-    current_server = None
-    for server_name, tool_name, description in _MCP_TOOLS:
-        if server_name != current_server:
-            lines.append(f"{server_name}:")
-            current_server = server_name
-
-        short_desc = description.strip().splitlines()[0] if description else ""
-        if len(short_desc) > 80:
-            short_desc = short_desc[:77] + "..."
-
-        if short_desc:
-            lines.append(f"- {tool_name}: {short_desc}")
-        else:
-            lines.append(f"- {tool_name}")
-
-    return lines
-
-
-@function_tool
+@registry.register("read_file", "读取文件内容")
 def read_file(path: str) -> str:
     """Read the contents of a file.
 
@@ -103,7 +63,7 @@ def read_file(path: str) -> str:
         return f"错误: 读取文件失败: {e}"
 
 
-@function_tool
+@registry.register("write_file", "写入/创建文件")
 def write_file(path: str, content: str) -> str:
     """Write content to a file. Creates the file if it doesn't exist.
 
@@ -135,7 +95,7 @@ def write_file(path: str, content: str) -> str:
         return f"错误: 写入文件失败: {e}"
 
 
-@function_tool
+@registry.register("list_directory", "列出目录内容")
 def list_directory(path: str = ".") -> str:
     """List the contents of a directory.
 
@@ -185,7 +145,7 @@ def list_directory(path: str = ".") -> str:
         return f"错误: 列出目录失败: {e}"
 
 
-@function_tool
+@registry.register("delete_file", "删除文件")
 def delete_file(path: str) -> str:
     """Delete a file.
 
@@ -217,7 +177,7 @@ def delete_file(path: str) -> str:
         return f"错误: 删除文件失败: {e}"
 
 
-@function_tool
+@registry.register("file_exists", "检查文件是否存在")
 def file_exists(path: str) -> str:
     """Check if a file or directory exists.
 
@@ -248,15 +208,15 @@ def file_exists(path: str) -> str:
         return f"错误: 检查路径失败: {e}"
 
 
-@function_tool
+@registry.register("list_tools", "列出当前可用工具")
 def list_tools() -> str:
     """List available built-in and MCP tools."""
     lines = ["内置工具:"]
-    for name, desc in BUILTIN_TOOL_DESCRIPTIONS:
+    for name, desc in registry.get_tool_descriptions():
         if desc:
             lines.append(f"- {name}: {desc}")
         else:
             lines.append(f"- {name}")
 
-    lines.extend(_format_mcp_tools())
+    lines.extend(registry.format_mcp_tools())
     return "\n".join(lines)

@@ -177,7 +177,7 @@ Skills 会自动激活！当你的请求匹配 skill 的描述时，系统会：
 
 - [Agent Skills 官方文档](https://code.claude.com/docs/en/skills)
 - [Agent Skills 开放标准](https://agentskills.io)
-- [设计文档](SKILLS_DESIGN.md)
+- [设计文档](docs/SKILLS_DESIGN.md)
 
 ## MCP (Model Context Protocol) Support
 

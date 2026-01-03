@@ -3,7 +3,7 @@
 import re
 from typing import List
 
-from skills.scanner import SkillMetadata
+from .scanner import SkillMetadata
 
 
 def _is_cjk_char(char: str) -> bool:

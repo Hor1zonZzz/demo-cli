@@ -5,7 +5,7 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Optional
 
-from skills.scanner import SkillMetadata
+from .scanner import SkillMetadata
 
 logger = logging.getLogger(__name__)
 

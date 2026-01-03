@@ -7,7 +7,7 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from mcp_support.manager import MCPManager
+from extensions.mcp.manager import MCPManager
 
 
 async def test_mcp_manager_load_config():

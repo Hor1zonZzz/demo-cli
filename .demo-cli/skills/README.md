@@ -90,6 +90,6 @@ description: 代码分析工具  # 太笼统，缺少触发关键词
 
 ## 了解更多
 
-- [SKILLS_DESIGN.md](../../SKILLS_DESIGN.md) - 系统设计文档
+- [SKILLS_DESIGN.md](../../docs/SKILLS_DESIGN.md) - 系统设计文档
 - [Agent Skills 标准](https://agentskills.io) - 开放标准规范
 - [Claude Code Skills](https://code.claude.com/docs/en/skills) - 官方文档

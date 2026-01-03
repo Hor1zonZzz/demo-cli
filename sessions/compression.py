@@ -7,7 +7,7 @@ from typing import Any
 
 from agents import Runner
 
-from cli_agents.summarizer import create_summarizer
+from demo_agents.summarizer import create_summarizer
 from sessions.manager import SessionManager
 
 

@@ -1,5 +1,6 @@
 """Tools module for agent function tools."""
 
+from .registry import registry
 from .file_tools import (
     read_file,
     write_file,
@@ -10,6 +11,7 @@ from .file_tools import (
 )
 
 __all__ = [
+    "registry",
     "read_file",
     "write_file",
     "list_directory",

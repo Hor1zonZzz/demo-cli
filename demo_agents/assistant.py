@@ -4,7 +4,7 @@ from typing import Any
 
 from agents import Agent
 
-from tools import read_file, write_file, list_directory, delete_file, file_exists, list_tools
+from tools import registry
 
 
 ASSISTANT_INSTRUCTIONS = """你是一个有帮助的命令行助手。你可以帮助用户完成各种任务。
@@ -43,14 +43,7 @@ def create_assistant(
         "name": "CLI Assistant",
         "instructions": instructions,
         "model": model,
-        "tools": [
-            read_file,
-            write_file,
-            list_directory,
-            delete_file,
-            file_exists,
-            list_tools,
-        ],
+        "tools": registry.get_builtin_tools(),
     }
 
     if mcp_servers:

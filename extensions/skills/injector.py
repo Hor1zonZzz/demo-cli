@@ -1,6 +1,6 @@
 """Skill injector for adding skills to agent instructions."""
 
-from skills.scanner import SkillMetadata
+from .scanner import SkillMetadata
 
 
 class SkillInjector:
