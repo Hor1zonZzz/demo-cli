@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Callable, TYPE_CHECKING
 
 from rich.console import Console
+from tools.file_tools import BUILTIN_TOOL_DESCRIPTIONS
 
 if TYPE_CHECKING:
     from sessions import SessionManager
@@ -73,13 +74,7 @@ def cmd_help(ctx: CommandContext) -> None:
 @registry.register("/tools", "显示可用工具")
 def cmd_tools(ctx: CommandContext) -> None:
     """Display available tools."""
-    builtin_tools = [
-        ("read_file", "读取文件内容"),
-        ("write_file", "写入/创建文件"),
-        ("list_directory", "列出目录内容"),
-        ("delete_file", "删除文件"),
-        ("file_exists", "检查文件是否存在"),
-    ]
+    builtin_tools = BUILTIN_TOOL_DESCRIPTIONS
     ctx.console.print()
     ctx.console.print("[bold]内置工具:[/bold]")
     for name, desc in builtin_tools:

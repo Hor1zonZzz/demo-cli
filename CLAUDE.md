@@ -355,7 +355,7 @@ App.run() → load_latest_session() → show_welcome() → main loop:
 **Important Notes:**
 - Instructions are in Chinese (target user base)
 - Model defaults to "deepseek-chat"
-- All tools are file operations (sandboxed)
+- Built-in tools are mainly file operations (sandboxed), plus tool listing; MCP can add more capabilities
 
 **Instruction Guidelines:**
 - Emphasize security (sandboxing, delete confirmation)
@@ -531,7 +531,7 @@ All user-facing strings are in Chinese:
 When modifying agent behavior:
 
 1. Keep instructions concise (current ~150 Chinese characters)
-2. List tools explicitly with descriptions
+2. Avoid hardcoding tool names; refer to available tools generically (MCP can change the list)
 3. Emphasize security constraints
 4. Remind about confirmation for destructive operations
 5. Encourage clarification questions

@@ -6,6 +6,7 @@ from .file_tools import (
     list_directory,
     delete_file,
     file_exists,
+    list_tools,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "list_directory",
     "delete_file",
     "file_exists",
+    "list_tools",
 ]

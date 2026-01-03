@@ -1,0 +1,14 @@
+{
+  "mcpServers": [
+    {
+      "name": "Filesystem MCP",
+      "type": "stdio",
+      "enabled": true,
+      "params": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/wangyilin/python-project/demo-cli"]
+      },
+      "description": "文件系统访问工具"
+    }
+  ]
+}

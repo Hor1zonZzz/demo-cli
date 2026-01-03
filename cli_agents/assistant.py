@@ -4,17 +4,13 @@ from typing import Any
 
 from agents import Agent
 
-from tools import read_file, write_file, list_directory, delete_file, file_exists
+from tools import read_file, write_file, list_directory, delete_file, file_exists, list_tools
 
 
 ASSISTANT_INSTRUCTIONS = """你是一个有帮助的命令行助手。你可以帮助用户完成各种任务。
 
-你具备以下文件操作能力:
-- 读取文件内容 (read_file)
-- 写入文件 (write_file)
-- 列出目录内容 (list_directory)
-- 删除文件 (delete_file)
-- 检查文件是否存在 (file_exists)
+你可以使用系统提供的工具来完成用户请求，工具列表可能会变化。
+如果用户询问可用工具或能力，请先调用 list_tools 返回准确列表。
 
 请注意:
 1. 所有文件操作都限制在工作目录内，无法访问工作目录之外的文件
@@ -48,6 +44,7 @@ def create_assistant(
             list_directory,
             delete_file,
             file_exists,
+            list_tools,
         ],
     }
 

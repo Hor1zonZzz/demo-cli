@@ -15,6 +15,7 @@ from cli.completer import show_command_menu
 from cli_agents.assistant import create_assistant
 from mcp_support import MCPManager
 from sessions import SessionManager
+from tools.file_tools import set_mcp_tools
 
 
 # Theme
@@ -170,6 +171,7 @@ class App:
                             )
             except Exception as e:
                 self.console.print(f"[warning]MCP 服务器初始化失败: {e}[/warning]")
+        set_mcp_tools(self._mcp_tools)
 
     async def _cleanup_mcp_servers(self) -> None:
         """Cleanup MCP servers."""
