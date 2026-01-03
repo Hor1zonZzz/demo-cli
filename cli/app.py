@@ -39,9 +39,10 @@ class App:
         self.console = Console(theme=_theme)
         self.session_manager = SessionManager()
         self.mcp_manager = MCPManager()
-        self.ctx = CommandContext(self.session_manager, self.console)
         self._selected_command: str | None = None
         self._mcp_servers: list = []
+        self._mcp_tools: list = []  # Cached MCP tools for /tools command
+        self.ctx = CommandContext(self.session_manager, self.console, self._mcp_tools)
 
         # Key bindings for instant "/" menu
         kb = KeyBindings()
@@ -153,18 +154,25 @@ class App:
         if self.mcp_manager.load_config():
             self.console.print("[dim]正在加载 MCP 配置...[/dim]")
             try:
-                self._mcp_servers = await self.mcp_manager.initialize_all_servers()
+                servers = await self.mcp_manager.initialize_all_servers()
+                self._mcp_servers.extend(servers)
                 if self._mcp_servers:
                     server_count = len(self._mcp_servers)
                     self.console.print(
                         f"[success]成功加载 {server_count} 个 MCP 服务器[/success]"
                     )
+                    # Cache MCP tools for /tools command
+                    for server in self._mcp_servers:
+                        tools = await server.list_tools()
+                        for tool in tools:
+                            self._mcp_tools.append(
+                                (server.name, tool.name, tool.description)
+                            )
             except Exception as e:
                 self.console.print(f"[warning]MCP 服务器初始化失败: {e}[/warning]")
-                self._mcp_servers = []
 
     async def _cleanup_mcp_servers(self) -> None:
         """Cleanup MCP servers."""
         if self._mcp_servers:
             await self.mcp_manager.cleanup_servers()
-            self._mcp_servers = []
+            self._mcp_servers.clear()  # Use clear to keep list reference

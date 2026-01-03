@@ -14,6 +14,7 @@ class CommandContext:
     """Context passed to command handlers."""
     session_manager: "SessionManager"
     console: Console
+    mcp_tools: list = None  # Cached MCP tools list [(server_name, tool_name, description), ...]
 
 
 @dataclass
@@ -72,7 +73,7 @@ def cmd_help(ctx: CommandContext) -> None:
 @registry.register("/tools", "显示可用工具")
 def cmd_tools(ctx: CommandContext) -> None:
     """Display available tools."""
-    tools = [
+    builtin_tools = [
         ("read_file", "读取文件内容"),
         ("write_file", "写入/创建文件"),
         ("list_directory", "列出目录内容"),
@@ -80,9 +81,21 @@ def cmd_tools(ctx: CommandContext) -> None:
         ("file_exists", "检查文件是否存在"),
     ]
     ctx.console.print()
-    ctx.console.print("[bold]可用工具:[/bold]")
-    for name, desc in tools:
-        ctx.console.print(f"  [cyan]{name:<16}[/cyan] {desc}")
+    ctx.console.print("[bold]内置工具:[/bold]")
+    for name, desc in builtin_tools:
+        ctx.console.print(f"  [cyan]{name:<20}[/cyan] {desc}")
+
+    # Show MCP tools if available (cached during initialization)
+    if ctx.mcp_tools:
+        current_server = None
+        for server_name, tool_name, description in ctx.mcp_tools:
+            if server_name != current_server:
+                ctx.console.print()
+                ctx.console.print(f"[bold]MCP 工具 ({server_name}):[/bold]")
+                current_server = server_name
+            desc = description[:40] + "..." if len(description) > 40 else description
+            ctx.console.print(f"  [green]{tool_name:<20}[/green] {desc}")
+
     ctx.console.print()
     ctx.console.print("[dim]所有文件操作限制在当前工作目录内[/dim]")
 
