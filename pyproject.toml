@@ -14,6 +14,9 @@ dependencies = [
     "simple-term-menu>=1.6.6",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0"]
+
 [project.scripts]
 demo-cli = "main:main"
 

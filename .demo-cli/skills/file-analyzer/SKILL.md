@@ -1,5 +1,6 @@
 ---
 name: file-analyzer
+version: 1.0.0
 description: 当用户需要分析文件内容、统计文件信息、或对文件进行深度检查时使用此skill。它可以帮助分析文件结构、代码质量、文件大小等。
 allowed-tools: [read_file, list_directory, file_exists]
 ---

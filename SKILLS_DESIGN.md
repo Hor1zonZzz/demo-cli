@@ -19,10 +19,10 @@
 
 ## 目录结构
 
-遵循标准的 Claude Code skills 结构：
+demo-cli 使用独立的 skills 目录结构：
 
 ```
-.claude/skills/
+.demo-cli/skills/
 ├── file-analyzer/
 │   ├── SKILL.md          # 必需：skill定义
 │   ├── reference.md      # 可选：参考文档
@@ -36,6 +36,7 @@
 ```markdown
 ---
 name: skill-identifier
+version: 1.0.0                            # 推荐：遵循 agentskills.io 标准
 description: 当需要XXX时使用此skill。它可以帮助...
 allowed-tools: [read_file, write_file]  # 可选
 model: deepseek-chat                      # 可选
@@ -62,7 +63,7 @@ model: deepseek-chat                      # 可选
 - 元数据（allowed-tools, model）
 
 **实现：**
-- 扫描 `.claude/skills/` 目录
+- 扫描 `.demo-cli/skills/` 目录
 - 解析每个 SKILL.md 的 YAML frontmatter
 - 存储为轻量级元数据列表
 
@@ -155,9 +156,9 @@ class SkillMatcher:
 # cli/app.py
 def __init__(self):
     # ... 现有代码 ...
-    self.skill_scanner = SkillScanner()
+    self.skill_scanner = SkillScanner()  # 默认扫描 .demo-cli/skills/
     self.skill_loader = SkillLoader()
-    self.skills_metadata = self.skill_scanner.scan_skills_directory(".claude/skills")
+    self.skills_metadata = self.skill_scanner.scan_skills_directory()
 ```
 
 ### 处理用户输入时（Level 2）

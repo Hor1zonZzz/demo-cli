@@ -100,10 +100,10 @@ Skills 是专门的能力模块，可以教会 AI 助手执行特定任务。与
 
 ### 创建 Skill
 
-在项目根目录创建 `.claude/skills/` 目录，然后为每个 skill 创建一个子目录：
+在项目根目录创建 `.demo-cli/skills/` 目录，然后为每个 skill 创建一个子目录：
 
 ```
-.claude/skills/
+.demo-cli/skills/
 └── my-skill/
     └── SKILL.md
 ```
@@ -113,6 +113,7 @@ SKILL.md 格式：
 ```markdown
 ---
 name: my-skill
+version: 1.0.0
 description: 当用户需要XXX时使用此skill。描述要清晰具体，包含触发关键词。
 allowed-tools: [read_file, write_file]  # 可选：限制可用工具
 ---

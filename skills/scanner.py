@@ -1,11 +1,13 @@
 """Skill scanner for Level 1 metadata loading."""
 
-import os
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -15,18 +17,20 @@ class SkillMetadata:
     name: str
     description: str
     skill_path: Path
+    version: Optional[str] = None
     allowed_tools: Optional[list[str]] = None
     model: Optional[str] = None
 
     def to_summary(self) -> str:
         """Convert to summary string for Level 1 loading."""
-        return f"- **{self.name}**: {self.description}"
+        version_str = f" (v{self.version})" if self.version else ""
+        return f"- **{self.name}**{version_str}: {self.description}"
 
 
 class SkillScanner:
     """Scanner for discovering and parsing skill metadata."""
 
-    def __init__(self, base_path: str = ".claude/skills"):
+    def __init__(self, base_path: str = ".demo-cli/skills"):
         """Initialize scanner.
 
         Args:
@@ -57,7 +61,7 @@ class SkillScanner:
                 if metadata:
                     skills.append(metadata)
             except Exception as e:
-                print(f"Warning: Failed to parse skill at {skill_dir}: {e}")
+                logger.warning(f"Failed to parse skill at {skill_dir}: {e}")
                 continue
 
         return skills
@@ -92,12 +96,13 @@ class SkillScanner:
                 name=frontmatter["name"],
                 description=frontmatter["description"],
                 skill_path=skill_md_path.parent,
+                version=frontmatter.get("version"),
                 allowed_tools=frontmatter.get("allowed-tools"),
                 model=frontmatter.get("model"),
             )
 
         except Exception as e:
-            print(f"Error parsing {skill_md_path}: {e}")
+            logger.error(f"Error parsing {skill_md_path}: {e}")
             return None
 
     def get_skills_summary(self, skills: list[SkillMetadata]) -> str:

@@ -1,5 +1,6 @@
 ---
 name: code-reviewer
+version: 1.0.0
 description: 当用户需要审查代码质量、检查代码规范、或提供代码改进建议时使用此skill。专注于代码质量、最佳实践和潜在问题。
 allowed-tools: [read_file, list_directory]
 ---

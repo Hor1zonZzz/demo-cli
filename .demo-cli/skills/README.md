@@ -30,9 +30,9 @@
 
 ## 如何添加新 Skill
 
-1. 在此目录创建新文件夹：`.claude/skills/your-skill-name/`
+1. 在此目录创建新文件夹：`.demo-cli/skills/your-skill-name/`
 2. 创建 `SKILL.md` 文件，包含：
-   - YAML frontmatter（name, description）
+   - YAML frontmatter（name, version, description）
    - 详细的 instructions
 3. （可选）添加 `examples.md`、`reference.md` 等支持文件
 4. 重启 demo-cli，新 skill 会自动加载
@@ -90,6 +90,6 @@ description: 代码分析工具  # 太笼统，缺少触发关键词
 
 ## 了解更多
 
-- [SKILLS_DESIGN.md](../SKILLS_DESIGN.md) - 系统设计文档
+- [SKILLS_DESIGN.md](../../SKILLS_DESIGN.md) - 系统设计文档
 - [Agent Skills 标准](https://agentskills.io) - 开放标准规范
 - [Claude Code Skills](https://code.claude.com/docs/en/skills) - 官方文档
