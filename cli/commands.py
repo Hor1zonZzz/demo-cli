@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Callable, TYPE_CHECKING
 
 from rich.console import Console
+from tools.file_tools import BUILTIN_TOOL_DESCRIPTIONS
 
 if TYPE_CHECKING:
     from sessions import SessionManager
@@ -14,6 +15,7 @@ class CommandContext:
     """Context passed to command handlers."""
     session_manager: "SessionManager"
     console: Console
+    mcp_tools: list = None  # Cached MCP tools list [(server_name, tool_name, description), ...]
 
 
 @dataclass
@@ -72,17 +74,23 @@ def cmd_help(ctx: CommandContext) -> None:
 @registry.register("/tools", "显示可用工具")
 def cmd_tools(ctx: CommandContext) -> None:
     """Display available tools."""
-    tools = [
-        ("read_file", "读取文件内容"),
-        ("write_file", "写入/创建文件"),
-        ("list_directory", "列出目录内容"),
-        ("delete_file", "删除文件"),
-        ("file_exists", "检查文件是否存在"),
-    ]
+    builtin_tools = BUILTIN_TOOL_DESCRIPTIONS
     ctx.console.print()
-    ctx.console.print("[bold]可用工具:[/bold]")
-    for name, desc in tools:
-        ctx.console.print(f"  [cyan]{name:<16}[/cyan] {desc}")
+    ctx.console.print("[bold]内置工具:[/bold]")
+    for name, desc in builtin_tools:
+        ctx.console.print(f"  [cyan]{name:<20}[/cyan] {desc}")
+
+    # Show MCP tools if available (cached during initialization)
+    if ctx.mcp_tools:
+        current_server = None
+        for server_name, tool_name, description in ctx.mcp_tools:
+            if server_name != current_server:
+                ctx.console.print()
+                ctx.console.print(f"[bold]MCP 工具 ({server_name}):[/bold]")
+                current_server = server_name
+            desc = description[:40] + "..." if len(description) > 40 else description
+            ctx.console.print(f"  [green]{tool_name:<20}[/green] {desc}")
+
     ctx.console.print()
     ctx.console.print("[dim]所有文件操作限制在当前工作目录内[/dim]")
 
@@ -99,6 +107,62 @@ def cmd_session(ctx: CommandContext) -> None:
     """Display current session ID."""
     session_id = ctx.session_manager.get_current_session_id()
     ctx.console.print(f"[dim]当前会话: {session_id}[/dim]")
+
+
+@registry.register("/mcp", "查看 MCP 服务器和工具")
+def cmd_mcp(ctx: CommandContext) -> None:
+    """Show MCP servers and their tools."""
+    from simple_term_menu import TerminalMenu
+
+    if not ctx.mcp_tools:
+        ctx.console.print("[warning]没有加载任何 MCP 服务器[/warning]")
+        ctx.console.print("[dim]请在项目目录下创建 demo.mcp.json 配置文件[/dim]")
+        return
+
+    # Group tools by server name
+    servers: dict[str, list[tuple[str, str]]] = {}
+    for server_name, tool_name, description in ctx.mcp_tools:
+        if server_name not in servers:
+            servers[server_name] = []
+        servers[server_name].append((tool_name, description))
+
+    server_names = list(servers.keys())
+
+    if len(server_names) == 1:
+        # Only one server, show tools directly
+        selected_server = server_names[0]
+    else:
+        # Multiple servers, let user choose
+        menu = TerminalMenu(
+            server_names,
+            title="选择 MCP 服务器",
+            menu_cursor="› ",
+            menu_cursor_style=("fg_purple", "bold"),
+            menu_highlight_style=("fg_purple",),
+            cycle_cursor=True,
+            clear_screen=False,
+        )
+        choice = menu.show()
+        if choice is None:
+            return
+        selected_server = server_names[choice]
+
+    # Show tools for selected server
+    tools = servers[selected_server]
+    ctx.console.print()
+    ctx.console.print(f"[bold]{selected_server}[/bold] - {len(tools)} 个工具")
+    ctx.console.print()
+
+    for tool_name, description in tools:
+        ctx.console.print(f"  [green]{tool_name}[/green]")
+        # Wrap description nicely
+        desc_lines = description.split('\n')
+        for line in desc_lines[:3]:  # Show first 3 lines
+            if line.strip():
+                ctx.console.print(f"    [dim]{line.strip()}[/dim]")
+        if len(desc_lines) > 3:
+            ctx.console.print(f"    [dim]...[/dim]")
+        ctx.console.print()
 
 
 @registry.register("/exit", "退出程序")

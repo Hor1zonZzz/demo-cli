@@ -155,17 +155,56 @@ Skills 会自动激活！当你的请求匹配 skill 的描述时，系统会：
 
 ### 优势
 
-- ✅ 支持无限数量的 skills，启动开销固定
-- ✅ 遵循开放的 Agent Skills 标准（agentskills.io）
-- ✅ 渐进式加载，只在需要时消耗 tokens
-- ✅ 自动发现和激活，无需手动调用
-- ✅ 可跨 AI 平台使用（标准化格式）
+- 支持无限数量的 skills，启动开销固定
+- 遵循开放的 Agent Skills 标准（agentskills.io）
+- 渐进式加载，只在需要时消耗 tokens
+- 自动发现和激活，无需手动调用
+- 可跨 AI 平台使用（标准化格式）
 
 ### 参考资源
 
 - [Agent Skills 官方文档](https://code.claude.com/docs/en/skills)
 - [Agent Skills 开放标准](https://agentskills.io)
 - [设计文档](SKILLS_DESIGN.md)
+
+## MCP (Model Context Protocol) Support
+
+Demo CLI supports MCP servers to extend the agent's capabilities. Create a `demo.mcp.json` file in your working directory to configure MCP servers:
+
+```json
+{
+  "mcpServers": [
+    {
+      "name": "Filesystem MCP",
+      "type": "stdio",
+      "enabled": true,
+      "params": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+      }
+    }
+  ]
+}
+```
+
+### Available MCP Servers
+
+- **@modelcontextprotocol/server-filesystem** - Additional file operations
+- **@modelcontextprotocol/server-fetch** - HTTP request tools
+- **@modelcontextprotocol/server-github** - GitHub API integration
+- **@modelcontextprotocol/server-slack** - Slack messaging
+- **@modelcontextprotocol/server-postgres** - PostgreSQL database access
+- **@modelcontextprotocol/server-brave-search** - Web search
+
+### MCP Server Types
+
+Demo CLI supports three MCP transport types:
+
+1. **stdio** - Local subprocess servers (recommended)
+2. **http** - HTTP/REST API servers
+3. **sse** - Server-Sent Events servers
+
+See `demo.mcp.json.example` for complete configuration examples.
 
 ## License
 

@@ -13,8 +13,10 @@ from agents import Runner
 from cli.commands import registry, CommandContext
 from cli.completer import show_command_menu
 from cli_agents.assistant import create_assistant, ASSISTANT_INSTRUCTIONS
+from mcp_support import MCPManager
 from sessions import SessionManager
 from skills import SkillScanner, SkillLoader, SkillMatcher, SkillInjector
+from tools.file_tools import set_mcp_tools
 
 
 # Theme
@@ -38,8 +40,11 @@ class App:
     def __init__(self):
         self.console = Console(theme=_theme)
         self.session_manager = SessionManager()
-        self.ctx = CommandContext(self.session_manager, self.console)
+        self.mcp_manager = MCPManager()
         self._selected_command: str | None = None
+        self._mcp_servers: list = []
+        self._mcp_tools: list = []  # Cached MCP tools for /tools command
+        self.ctx = CommandContext(self.session_manager, self.console, self._mcp_tools)
 
         # Skills progressive loading (Level 1: Metadata)
         self.skill_scanner = SkillScanner()
@@ -78,6 +83,13 @@ class App:
             skill_names = [s.name for s in self.available_skills]
             self.console.print(f"[dim]已加载 {len(self.available_skills)} 个 Skills: {', '.join(skill_names)}[/dim]")
 
+        # Show MCP servers if enabled
+        if self._mcp_servers:
+            server_names = self.mcp_manager.get_enabled_server_names()
+            self.console.print(
+                f"[dim]MCP 服务器: {', '.join(server_names)}[/dim]"
+            )
+
     async def _run_agent(self, user_input: str) -> str:
         """Run the agent with user input."""
         # Level 2: Match and load relevant skills
@@ -108,8 +120,11 @@ class App:
                 activated_names = [s[0].name for s in skills_with_content]
                 self.console.print(f"[dim]🔧 激活 Skills: {', '.join(activated_names)}[/dim]")
 
-        # Create agent with enhanced instructions
-        agent = create_assistant(enhanced_instructions=enhanced_instructions)
+        # Create agent with enhanced instructions and MCP servers
+        agent = create_assistant(
+            enhanced_instructions=enhanced_instructions,
+            mcp_servers=self._mcp_servers if self._mcp_servers else None
+        )
         messages = self.session_manager.get_messages()
         messages.append({"role": "user", "content": user_input})
         result = await Runner.run(agent, messages)
@@ -140,34 +155,71 @@ class App:
 
     async def run(self) -> None:
         """Run the main loop."""
+        # Load session
         if not self.session_manager.load_latest_session():
             self.session_manager.create_session()
 
+        # Initialize MCP servers
+        await self._initialize_mcp_servers()
+
         self._show_welcome()
 
-        while True:
+        try:
+            while True:
+                try:
+                    self.console.print()
+                    user_input = await self.prompt_session.prompt_async(
+                        [("class:prompt", "> ")],
+                    )
+                    user_input = user_input.strip()
+
+                    if not user_input:
+                        continue
+
+                    if user_input.startswith("/"):
+                        should_exit = await self._handle_command(user_input)
+                        if should_exit:
+                            break
+                    else:
+                        await self._handle_chat(user_input)
+
+                except KeyboardInterrupt:
+                    self.console.print("\n[dim]再见![/dim]")
+                    break
+                except EOFError:
+                    self.console.print("\n[dim]再见![/dim]")
+                    break
+                except Exception as e:
+                    self.console.print(f"[error]错误: {e}[/error]")
+        finally:
+            # Cleanup MCP servers on exit
+            await self._cleanup_mcp_servers()
+
+    async def _initialize_mcp_servers(self) -> None:
+        """Initialize MCP servers from configuration file."""
+        if self.mcp_manager.load_config():
+            self.console.print("[dim]正在加载 MCP 配置...[/dim]")
             try:
-                self.console.print()
-                user_input = await self.prompt_session.prompt_async(
-                    [("class:prompt", "> ")],
-                )
-                user_input = user_input.strip()
-
-                if not user_input:
-                    continue
-
-                if user_input.startswith("/"):
-                    should_exit = await self._handle_command(user_input)
-                    if should_exit:
-                        break
-                else:
-                    await self._handle_chat(user_input)
-
-            except KeyboardInterrupt:
-                self.console.print("\n[dim]再见![/dim]")
-                break
-            except EOFError:
-                self.console.print("\n[dim]再见![/dim]")
-                break
+                servers = await self.mcp_manager.initialize_all_servers()
+                self._mcp_servers.extend(servers)
+                if self._mcp_servers:
+                    server_count = len(self._mcp_servers)
+                    self.console.print(
+                        f"[success]成功加载 {server_count} 个 MCP 服务器[/success]"
+                    )
+                    # Cache MCP tools for /tools command
+                    for server in self._mcp_servers:
+                        tools = await server.list_tools()
+                        for tool in tools:
+                            self._mcp_tools.append(
+                                (server.name, tool.name, tool.description)
+                            )
             except Exception as e:
-                self.console.print(f"[error]错误: {e}[/error]")
+                self.console.print(f"[warning]MCP 服务器初始化失败: {e}[/warning]")
+        set_mcp_tools(self._mcp_tools)
+
+    async def _cleanup_mcp_servers(self) -> None:
+        """Cleanup MCP servers."""
+        if self._mcp_servers:
+            await self.mcp_manager.cleanup_servers()
+            self._mcp_servers.clear()  # Use clear to keep list reference

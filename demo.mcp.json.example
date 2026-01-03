@@ -1,0 +1,63 @@
+{
+  "mcpServers": [
+    {
+      "name": "Filesystem MCP",
+      "type": "stdio",
+      "enabled": true,
+      "params": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+        "env": null
+      },
+      "description": "提供文件系统访问工具"
+    },
+    {
+      "name": "Fetch MCP",
+      "type": "stdio",
+      "enabled": false,
+      "params": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-fetch"]
+      },
+      "description": "提供 HTTP 请求工具"
+    },
+    {
+      "name": "GitHub MCP",
+      "type": "stdio",
+      "enabled": false,
+      "params": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-github"],
+        "env": {
+          "GITHUB_PERSONAL_ACCESS_TOKEN": "your_token_here"
+        }
+      },
+      "description": "提供 GitHub API 访问"
+    },
+    {
+      "name": "Custom HTTP MCP",
+      "type": "http",
+      "enabled": false,
+      "params": {
+        "url": "http://localhost:8000/mcp",
+        "headers": {
+          "Authorization": "Bearer your_token_here"
+        },
+        "timeout": 30
+      },
+      "description": "自定义 HTTP MCP 服务器"
+    },
+    {
+      "name": "SSE MCP Server",
+      "type": "sse",
+      "enabled": false,
+      "params": {
+        "url": "http://localhost:3000/sse",
+        "headers": {
+          "X-API-Key": "your_api_key"
+        }
+      },
+      "description": "SSE 传输的 MCP 服务器"
+    }
+  ]
+}
