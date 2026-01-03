@@ -1,11 +1,13 @@
 """Session manager for multi-turn conversation persistence."""
 
 import json
-import os
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+
+_SUMMARY_PREFIX = "Conversation summary (for context):"
 
 
 class SessionManager:
@@ -21,6 +23,8 @@ class SessionManager:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self._current_session_id: Optional[str] = None
         self._messages: list[dict] = []
+        self._summary: Optional[str] = None
+        self._last_prompt_tokens: Optional[int] = None
 
     def create_session(self) -> str:
         """Create a new session.
@@ -30,6 +34,8 @@ class SessionManager:
         """
         self._current_session_id = str(uuid.uuid4())[:8]
         self._messages = []
+        self._summary = None
+        self._last_prompt_tokens = None
         self._save_session()
         return self._current_session_id
 
@@ -51,6 +57,8 @@ class SessionManager:
                 data = json.load(f)
                 self._current_session_id = data.get("session_id", session_id)
                 self._messages = data.get("messages", [])
+                self._summary = data.get("summary")
+                self._last_prompt_tokens = data.get("last_prompt_tokens")
                 return True
         except (json.JSONDecodeError, IOError):
             return False
@@ -93,7 +101,47 @@ class SessionManager:
         Returns:
             List of message dictionaries with 'role' and 'content' keys.
         """
-        return [{"role": m["role"], "content": m["content"]} for m in self._messages]
+        messages = []
+        if self._summary:
+            messages.append({"role": "system", "content": self._format_summary()})
+        messages.extend(
+            [{"role": m["role"], "content": m["content"]} for m in self._messages]
+        )
+        return messages
+
+    def get_messages_for_summary(self) -> list[dict]:
+        """Get messages for summarization, including any existing summary."""
+        messages = []
+        if self._summary:
+            messages.append({"role": "system", "content": self._format_summary()})
+        messages.extend(
+            [{"role": m["role"], "content": m["content"]} for m in self._messages]
+        )
+        return messages
+
+    def message_count(self) -> int:
+        """Return the number of stored messages."""
+        return len(self._messages)
+
+    def set_last_prompt_tokens(self, prompt_tokens: int) -> None:
+        """Store the last prompt token count."""
+        self._last_prompt_tokens = prompt_tokens
+        self._save_session()
+
+    def get_last_prompt_tokens(self) -> Optional[int]:
+        """Get the last prompt token count."""
+        return self._last_prompt_tokens
+
+    def clear_last_prompt_tokens(self) -> None:
+        """Clear the last prompt token count."""
+        self._last_prompt_tokens = None
+        self._save_session()
+
+    def apply_summary(self, summary: str, keep_last_messages: int = 0) -> None:
+        """Apply a summary and drop older messages."""
+        self._summary = summary
+        self._messages = self._select_messages_to_keep(keep_last_messages)
+        self._save_session()
 
     def clear_session(self) -> str:
         """Clear the current session and create a new one.
@@ -120,8 +168,32 @@ class SessionManager:
         data = {
             "session_id": self._current_session_id,
             "created_at": datetime.now().isoformat(),
-            "messages": self._messages
+            "messages": self._messages,
+            "summary": self._summary,
+            "last_prompt_tokens": self._last_prompt_tokens,
         }
 
         with open(session_file, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+
+    def _format_summary(self) -> str:
+        summary = self._summary.strip()
+        return f"{_SUMMARY_PREFIX}\n{summary}"
+
+    def _select_messages_to_keep(self, keep_last_messages: int) -> list[dict]:
+        non_tool_indices = [
+            index
+            for index, message in enumerate(self._messages)
+            if message.get("role") != "tool"
+        ]
+
+        if keep_last_messages <= 0:
+            keep_indices = set()
+        else:
+            keep_indices = set(non_tool_indices[-keep_last_messages:])
+
+        for index, message in enumerate(self._messages):
+            if message.get("role") == "tool":
+                keep_indices.add(index)
+
+        return [message for index, message in enumerate(self._messages) if index in keep_indices]
