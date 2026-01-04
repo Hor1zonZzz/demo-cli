@@ -62,6 +62,10 @@ class SkillInjector:
             "",
             f"*{skill_metadata.description}*",
             "",
+            f"**Skill Resources Directory**: `{skill_metadata.skill_path}`",
+            "",
+            "You can use file reading tools to access any resource files in this directory (e.g., examples.md, reference.md).",
+            "",
             skill_content,
         ]
 
@@ -93,6 +97,7 @@ class SkillInjector:
         for skill_metadata, skill_content in skills_with_content:
             enhanced += f"### {skill_metadata.name}\n\n"
             enhanced += f"*{skill_metadata.description}*\n\n"
+            enhanced += f"**Skill Resources Directory**: `{skill_metadata.skill_path}`\n\n"
             enhanced += skill_content + "\n\n"
 
         return enhanced
