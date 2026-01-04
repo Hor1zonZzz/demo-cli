@@ -27,7 +27,8 @@ def setup_deepseek_client() -> None:
     client = AsyncOpenAI(api_key=api_key, base_url=base_url)
     set_default_openai_client(client)
     set_default_openai_api("chat_completions")
-    set_tracing_disabled(True)
+    enable_tracing = os.getenv("ENABLE_TRACING", "").lower() in ("1", "true", "yes")
+    set_tracing_disabled(not enable_tracing)
 
 
 def main() -> None:

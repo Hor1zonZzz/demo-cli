@@ -302,6 +302,8 @@ class TestSkillInjector:
         assert self.base_instructions in result
         assert "Active Skill: test-skill" in result
         assert "Do the thing" in result
+        assert "Skill Resources Directory" in result
+        assert str(self.skill.skill_path) in result
 
     def test_inject_multiple_skills(self):
         skill2 = SkillMetadata(
@@ -323,3 +325,5 @@ class TestSkillInjector:
         assert "another-skill" in result
         assert "Content 1" in result
         assert "Content 2" in result
+        assert "Skill Resources Directory" in result
+        assert str(self.skill.skill_path) in result

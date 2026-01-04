@@ -59,6 +59,7 @@ class App:
         self.mcp_manager = MCPManager()
         self._mcp_servers: list = []
         self._mcp_tools: list = []  # Cached MCP tools for /tools command
+        self._tracing_enabled: bool = False  # Track if tracing is enabled
         
         # Command context
         self.ctx = CommandContext(
@@ -127,8 +128,12 @@ class App:
         if activated_skills:
             self.console.print(f"[dim]🔧 激活 Skills: {', '.join(activated_skills)}[/dim]")
 
-        with self.console.status("[cyan]思考中...[/cyan]", spinner="dots"):
+        # Disable spinner if tracing is enabled to show trace logs
+        if self._tracing_enabled:
             response = await self.agent_runner.run(user_input)
+        else:
+            with self.console.status("[cyan]思考中...[/cyan]", spinner="dots"):
+                response = await self.agent_runner.run(user_input)
 
         self.context_manager.save_message("assistant", response.content)
         if response.prompt_tokens is not None:
@@ -148,10 +153,12 @@ class App:
             verbose = os.getenv("TRACING_VERBOSE", "").lower() in ("1", "true", "yes")
             log_to_file = os.getenv("TRACING_LOG_TO_FILE", "").lower() in ("1", "true", "yes")
             setup_local_tracing(
+                console=self.console,
                 log_to_console=True,
                 log_to_file=log_to_file,
                 verbose=verbose,
             )
+            self._tracing_enabled = True
             self.console.print("[dim]🔍 本地追踪已启用[/dim]")
         
         # Load session
