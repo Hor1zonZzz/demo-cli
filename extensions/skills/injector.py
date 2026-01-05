@@ -1,103 +1,66 @@
-"""Skill injector for adding skills to agent instructions."""
+"""Skill injector for adding skills awareness to agent instructions.
+
+Follows the Agent Skills specification: https://agentskills.io/specification
+Uses XML format for skill injection as recommended by the specification.
+
+The agent dynamically loads skill instructions using file reading tools
+when needed, based on the <location> path provided.
+"""
 
 from .scanner import SkillMetadata
 
+# Instruction template guiding agent to load skills on-demand
+SKILLS_INSTRUCTION = """
+<skills_instructions>
+You have access to specialized skills that provide domain expertise and detailed workflows.
 
-class SkillInjector:
-    """Injector for adding skills to agent instructions."""
+## What are Skills?
+Skills are instruction sets located in directories containing a SKILL.md file.
+Each skill provides step-by-step guidance for specific tasks.
 
-    def inject_metadata_summary(
-        self, base_instructions: str, skills: list[SkillMetadata]
-    ) -> str:
-        """Inject Level 1 metadata summary into agent instructions.
+## How to Use Skills
+1. Review <available_skills> below to find skills matching the user's task
+2. When a skill is relevant, use read_file to load `<location>/SKILL.md`
+3. Follow the skill's instructions carefully to complete the task
+4. Skills may have additional resources in subdirectories:
+   - references/ - documentation and guides
+   - scripts/ - executable code
+   - assets/ - templates and static files
 
-        Args:
-            base_instructions: Original agent instructions.
-            skills: List of all available skills.
+## Important
+- Only load a skill when it's clearly relevant to the current task
+- Read the full SKILL.md before starting the task
+- You can access any file within the skill's directory using read_file
+</skills_instructions>
+"""
 
-        Returns:
-            Enhanced instructions with skills metadata.
-        """
-        if not skills:
-            return base_instructions
 
-        summary_lines = [
-            "",
-            "---",
-            "",
-            "## Available Skills",
-            "",
-            "You have access to the following specialized skills. "
-            "These skills will be automatically activated when relevant to the user's request:",
-            "",
-        ]
+def inject_skills(base_instructions: str, skills: list[SkillMetadata]) -> str:
+    """Inject skills awareness into agent instructions.
 
-        for skill in skills:
-            summary_lines.append(f"- **{skill.name}**: {skill.description}")
+    Adds <skills_instructions> and <available_skills> to the base instructions,
+    enabling the agent to discover and load skills on-demand.
 
-        summary = "\n".join(summary_lines)
-        return base_instructions + summary
+    Args:
+        base_instructions: Original agent instructions.
+        skills: List of available SkillMetadata objects.
 
-    def inject_full_skill(
-        self, base_instructions: str, skill_metadata: SkillMetadata, skill_content: str
-    ) -> str:
-        """Inject Level 2 full skill instructions into agent instructions.
+    Returns:
+        Enhanced instructions with skills awareness.
+    """
+    if not skills:
+        return base_instructions
 
-        Args:
-            base_instructions: Original agent instructions.
-            skill_metadata: Metadata of the skill being injected.
-            skill_content: Full skill instructions content.
+    # Build XML format as per Agent Skills specification
+    xml_lines = ["<available_skills>"]
+    for skill in skills:
+        xml_lines.append("  <skill>")
+        xml_lines.append(f"    <name>{skill.name}</name>")
+        xml_lines.append(f"    <description>{skill.description}</description>")
+        xml_lines.append(f"    <location>{skill.skill_path}</location>")
+        xml_lines.append("  </skill>")
+    xml_lines.append("</available_skills>")
 
-        Returns:
-            Enhanced instructions with full skill content.
-        """
-        if not skill_content:
-            return base_instructions
+    skills_xml = "\n".join(xml_lines)
 
-        skill_section = [
-            "",
-            "---",
-            "",
-            f"## Active Skill: {skill_metadata.name}",
-            "",
-            f"*{skill_metadata.description}*",
-            "",
-            f"**Skill Resources Directory**: `{skill_metadata.skill_path}`",
-            "",
-            "You can use file reading tools to access any resource files in this directory (e.g., examples.md, reference.md).",
-            "",
-            skill_content,
-        ]
-
-        skill_text = "\n".join(skill_section)
-        return base_instructions + skill_text
-
-    def inject_multiple_skills(
-        self,
-        base_instructions: str,
-        skills_with_content: list[tuple[SkillMetadata, str]],
-    ) -> str:
-        """Inject multiple full skills into agent instructions.
-
-        Args:
-            base_instructions: Original agent instructions.
-            skills_with_content: List of (SkillMetadata, content) tuples.
-
-        Returns:
-            Enhanced instructions with all skill contents.
-        """
-        enhanced = base_instructions
-
-        if not skills_with_content:
-            return enhanced
-
-        enhanced += "\n\n---\n\n## Active Skills\n"
-        enhanced += "\nThe following skills are active for this request:\n\n"
-
-        for skill_metadata, skill_content in skills_with_content:
-            enhanced += f"### {skill_metadata.name}\n\n"
-            enhanced += f"*{skill_metadata.description}*\n\n"
-            enhanced += f"**Skill Resources Directory**: `{skill_metadata.skill_path}`\n\n"
-            enhanced += skill_content + "\n\n"
-
-        return enhanced
+    return base_instructions + "\n" + SKILLS_INSTRUCTION + "\n" + skills_xml

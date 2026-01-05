@@ -12,19 +12,43 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class SkillMetadata:
-    """Lightweight skill metadata (~30-50 tokens per skill)."""
+    """Lightweight skill metadata following Agent Skills specification.
 
+    See: https://agentskills.io/specification
+    """
+
+    # Required fields
     name: str
     description: str
     skill_path: Path
+
+    # Optional fields per specification
     version: Optional[str] = None
     allowed_tools: Optional[list[str]] = None
     model: Optional[str] = None
+    license: Optional[str] = None
+    compatibility: Optional[str] = None
+    metadata: Optional[dict[str, str]] = None
 
     def to_summary(self) -> str:
-        """Convert to summary string for Level 1 loading."""
+        """Convert to summary string for Level 1 loading (deprecated, use to_xml)."""
         version_str = f" (v{self.version})" if self.version else ""
         return f"- **{self.name}**{version_str}: {self.description}"
+
+    def to_xml(self) -> str:
+        """Convert to XML format following Agent Skills specification.
+
+        Returns:
+            XML string for <available_skills> block.
+        """
+        lines = [
+            "  <skill>",
+            f"    <name>{self.name}</name>",
+            f"    <description>{self.description}</description>",
+            f"    <location>{self.skill_path}</location>",
+            "  </skill>",
+        ]
+        return "\n".join(lines)
 
 
 class SkillScanner:
@@ -99,6 +123,9 @@ class SkillScanner:
                 version=frontmatter.get("version"),
                 allowed_tools=frontmatter.get("allowed-tools"),
                 model=frontmatter.get("model"),
+                license=frontmatter.get("license"),
+                compatibility=frontmatter.get("compatibility"),
+                metadata=frontmatter.get("metadata"),
             )
 
         except Exception as e:
@@ -106,13 +133,16 @@ class SkillScanner:
             return None
 
     def get_skills_summary(self, skills: list[SkillMetadata]) -> str:
-        """Generate a summary of available skills for Level 1 injection.
+        """Generate a summary of available skills for Level 1 injection (deprecated).
 
         Args:
             skills: List of SkillMetadata objects.
 
         Returns:
-            Formatted summary string.
+            Formatted summary string in Markdown format.
+
+        Note:
+            Use get_skills_xml() for spec-compliant XML format.
         """
         if not skills:
             return ""
@@ -122,3 +152,22 @@ class SkillScanner:
             summary_lines.append(skill.to_summary())
 
         return "\n".join(summary_lines)
+
+    def get_skills_xml(self, skills: list[SkillMetadata]) -> str:
+        """Generate XML block of available skills following Agent Skills specification.
+
+        Args:
+            skills: List of SkillMetadata objects.
+
+        Returns:
+            XML formatted string with <available_skills> block.
+        """
+        if not skills:
+            return ""
+
+        lines = ["<available_skills>"]
+        for skill in skills:
+            lines.append(skill.to_xml())
+        lines.append("</available_skills>")
+
+        return "\n".join(lines)
