@@ -145,6 +145,8 @@ class SkillInjector:
     def _build_resources_info(self, skill_metadata: SkillMetadata) -> str:
         """Build resources info string for a skill.
 
+        Follows Agent Skills specification directory structure.
+
         Args:
             skill_metadata: Metadata of the skill.
 
@@ -153,7 +155,6 @@ class SkillInjector:
         """
         resources = []
 
-        # Check for standard directories per specification
         refs_dir = skill_metadata.get_references_dir()
         scripts_dir = skill_metadata.get_scripts_dir()
         assets_dir = skill_metadata.get_assets_dir()
@@ -164,12 +165,5 @@ class SkillInjector:
             resources.append(f"scripts: {scripts_dir}")
         if assets_dir.exists():
             resources.append(f"assets: {assets_dir}")
-
-        # Also check for legacy resource files in skill root
-        skill_path = skill_metadata.skill_path
-        for legacy_file in ["examples.md", "reference.md"]:
-            legacy_path = skill_path / legacy_file
-            if legacy_path.exists():
-                resources.append(f"{legacy_file}: {legacy_path}")
 
         return "; ".join(resources) if resources else ""

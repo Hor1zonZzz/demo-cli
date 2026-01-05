@@ -264,26 +264,9 @@ class SkillValidator:
     def _validate_directory_structure(
         self, skill_path: Path, result: ValidationResult
     ) -> None:
-        """Check for recommended directory structure."""
-        # Check for recommended directories
-        refs_dir = skill_path / "references"
-        scripts_dir = skill_path / "scripts"
-        assets_dir = skill_path / "assets"
-
-        # Check for legacy resource files in root
-        legacy_files = ["examples.md", "reference.md"]
-        for legacy_file in legacy_files:
-            if (skill_path / legacy_file).exists():
-                result.add_warning(
-                    f"Consider moving '{legacy_file}' to references/ directory "
-                    "per Agent Skills specification"
-                )
-
-        # Info about optional directories (not warnings)
-        has_resources = refs_dir.exists() or scripts_dir.exists() or assets_dir.exists()
-        if not has_resources:
-            # Not a warning, just checking
-            pass
+        """Check for recommended directory structure per Agent Skills specification."""
+        # Directories are optional per spec, no warnings needed
+        pass
 
 
 def validate_skill(skill_path: Path | str) -> ValidationResult:

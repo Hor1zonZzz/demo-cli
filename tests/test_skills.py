@@ -221,10 +221,13 @@ Step 2: Do that
             assert "---" not in instructions  # Frontmatter should be removed
 
     def test_load_skill_resource(self):
+        """Test loading resource from references/ directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
             skill_dir = Path(tmpdir) / "test-skill"
             skill_dir.mkdir()
-            examples_md = skill_dir / "examples.md"
+            refs_dir = skill_dir / "references"
+            refs_dir.mkdir()
+            examples_md = refs_dir / "examples.md"
             examples_md.write_text("# Examples\n\nExample content here.")
 
             metadata = SkillMetadata(
@@ -420,7 +423,7 @@ class TestSkillLoaderDirectories:
             skill_dir = Path(tmpdir) / "test-skill"
             skill_dir.mkdir()
 
-            # Create directories
+            # Create directories per Agent Skills specification
             (skill_dir / "references").mkdir()
             (skill_dir / "scripts").mkdir()
             (skill_dir / "assets").mkdir()
@@ -429,7 +432,6 @@ class TestSkillLoaderDirectories:
             (skill_dir / "references" / "REFERENCE.md").write_text("ref")
             (skill_dir / "scripts" / "analyze.py").write_text("script")
             (skill_dir / "assets" / "template.txt").write_text("asset")
-            (skill_dir / "examples.md").write_text("legacy")
 
             metadata = SkillMetadata(
                 name="test-skill",
@@ -443,7 +445,6 @@ class TestSkillLoaderDirectories:
             assert "REFERENCE.md" in resources["references"]
             assert "analyze.py" in resources["scripts"]
             assert "template.txt" in resources["assets"]
-            assert "examples.md" in resources["legacy"]
 
 
 class TestSkillValidator:
@@ -563,28 +564,6 @@ Instructions here.
             result = validate_skill(skill_dir)
 
             assert any("keywords" in w for w in result.warnings)
-
-    def test_validate_legacy_files_warning(self):
-        """Test warning for legacy resource files in root."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            skill_dir = Path(tmpdir) / "test-skill"
-            skill_dir.mkdir()
-            skill_md = skill_dir / "SKILL.md"
-            skill_md.write_text(
-                """---
-name: test-skill
-description: A test skill for testing purposes with keywords
----
-
-Instructions here.
-"""
-            )
-            # Create legacy file
-            (skill_dir / "examples.md").write_text("examples")
-
-            result = validate_skill(skill_dir)
-
-            assert any("references/" in w for w in result.warnings)
 
     def test_validate_all_optional_fields(self):
         """Test validation with all optional fields."""

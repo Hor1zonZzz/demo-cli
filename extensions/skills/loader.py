@@ -102,32 +102,25 @@ class SkillLoader:
     def load_skill_resource(
         self, skill_metadata: SkillMetadata, resource_name: str
     ) -> Optional[str]:
-        """Load a skill resource file for Level 3 loading.
+        """Load a skill resource file from references/ directory.
 
-        Follows Agent Skills specification by checking:
-        1. references/ directory first (spec-compliant)
-        2. Skill root directory (legacy support)
+        Follows Agent Skills specification:
+        https://agentskills.io/specification
 
         Args:
             skill_metadata: SkillMetadata object.
-            resource_name: Name of the resource file (e.g., 'REFERENCE.md', 'examples.md').
+            resource_name: Name of the resource file (e.g., 'REFERENCE.md').
 
         Returns:
             Resource file content or None if not found.
         """
-        # Check cache
         cache_key = f"resource:{skill_metadata.name}:{resource_name}"
         cached = self._cache.get(cache_key)
         if cached is not None:
             return cached
 
-        # Try references/ directory first (spec-compliant)
         refs_dir = skill_metadata.get_references_dir()
         resource_path = refs_dir / resource_name
-
-        # Fall back to skill root (legacy support)
-        if not resource_path.exists():
-            resource_path = skill_metadata.skill_path / resource_name
 
         if not resource_path.exists():
             return None
@@ -136,7 +129,6 @@ class SkillLoader:
             with open(resource_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            # Cache the result
             self._cache.set(cache_key, content)
             return content
 
@@ -181,37 +173,29 @@ class SkillLoader:
     def list_resources(self, skill_metadata: SkillMetadata) -> dict[str, list[str]]:
         """List all available resources for a skill.
 
+        Follows Agent Skills specification directory structure.
+
         Returns:
-            Dictionary with keys 'references', 'scripts', 'assets', 'legacy'
+            Dictionary with keys 'references', 'scripts', 'assets'
             containing lists of file names.
         """
-        result = {
+        result: dict[str, list[str]] = {
             "references": [],
             "scripts": [],
             "assets": [],
-            "legacy": [],
         }
 
-        # Check references/
         refs_dir = skill_metadata.get_references_dir()
         if refs_dir.exists():
             result["references"] = [f.name for f in refs_dir.iterdir() if f.is_file()]
 
-        # Check scripts/
         scripts_dir = skill_metadata.get_scripts_dir()
         if scripts_dir.exists():
             result["scripts"] = [f.name for f in scripts_dir.iterdir() if f.is_file()]
 
-        # Check assets/
         assets_dir = skill_metadata.get_assets_dir()
         if assets_dir.exists():
             result["assets"] = [f.name for f in assets_dir.iterdir() if f.is_file()]
-
-        # Check legacy files in skill root
-        skill_path = skill_metadata.skill_path
-        for legacy_file in ["examples.md", "reference.md", "REFERENCE.md"]:
-            if (skill_path / legacy_file).exists():
-                result["legacy"].append(legacy_file)
 
         return result
 
