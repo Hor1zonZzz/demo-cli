@@ -1,204 +1,219 @@
-# Skills 渐进式加载设计文档
+# Skills 系统设计文档
 
 ## 背景
 
-基于 Agent Skills 开放标准（agentskills.io），为 demo-cli 项目实现 skills 渐进式加载功能。
+基于 [Agent Skills 开放标准](https://agentskills.io)，为 demo-cli 项目实现简化的 skills 按需加载功能。
 
-## 核心发现
+## 设计原则
 
-- **openai-agents SDK 0.6.4 不支持原生 skills**
-- Agent Skills 是开放标准（Anthropic 发布，2025年12月18日）
-- 需要自定义实现 skills 加载机制
-
-## 设计目标
-
-1. 遵循 Agent Skills 标准格式
-2. 实现三级渐进式加载架构
-3. 自动发现并注入 skills 到项目启动流程
-4. 最小化启动时的 token 消耗
+1. **遵循 Agent Skills 标准**：使用 XML 格式注入 skills 信息
+2. **Agent 自主加载**：Agent 使用文件读取工具按需加载 skill 内容
+3. **最小化复杂度**：无需 matcher/loader 组件，Agent 自行决策
+4. **Token 高效**：启动时只加载元数据，完整内容按需加载
 
 ## 目录结构
 
-demo-cli 使用独立的 skills 目录结构：
-
 ```
 .demo-cli/skills/
+├── README.md              # Skills 使用说明
 ├── file-analyzer/
-│   ├── SKILL.md          # 必需：skill定义
-│   ├── reference.md      # 可选：参考文档
-│   └── examples.md       # 可选：使用示例
+│   ├── SKILL.md           # 必需：skill 定义
+│   ├── references/        # 可选：参考文档
+│   ├── scripts/           # 可选：可执行脚本
+│   └── assets/            # 可选：模板和静态文件
 └── code-reviewer/
     └── SKILL.md
 ```
 
 ## SKILL.md 格式
 
+遵循 Agent Skills 规范的 YAML frontmatter：
+
 ```markdown
 ---
 name: skill-identifier
-version: 1.0.0                            # 推荐：遵循 agentskills.io 标准
-description: 当需要XXX时使用此skill。它可以帮助...
+version: 1.0.0
+description: 清晰描述此 skill 的用途和适用场景。
 allowed-tools: [read_file, write_file]  # 可选
-model: deepseek-chat                      # 可选
+model: deepseek-chat                     # 可选
+license: MIT                             # 可选
+compatibility: ">=1.0.0"                 # 可选
+metadata:                                # 可选
+  author: "Your Name"
+  tags: "analysis, code"
 ---
 
 # Skill Instructions
 
-这里是详细的指令...
+详细的任务指令...
 
 ## Steps
 1. 步骤1
 2. 步骤2
 ```
 
-## 三级渐进式加载架构
+## 系统架构
 
-### Level 1: Metadata Loading (~100 tokens)
+### 组件
 
-**触发时机：** 应用启动时
+```
+extensions/skills/
+├── __init__.py        # 模块导出
+├── scanner.py         # SkillScanner - 发现和解析 skill 元数据
+├── injector.py        # inject_skills() - 注入 skills 到系统提示
+└── validator.py       # SkillValidator - 验证 skill 格式
+```
 
-**加载内容：**
-- Skill name
-- Skill description
-- 元数据（allowed-tools, model）
+### 数据流
 
-**实现：**
-- 扫描 `.demo-cli/skills/` 目录
-- 解析每个 SKILL.md 的 YAML frontmatter
-- 存储为轻量级元数据列表
+```
+启动时:
+  SkillScanner.scan_skills_directory()
+    → 扫描 .demo-cli/skills/
+    → 解析每个 SKILL.md 的 YAML frontmatter
+    → 返回 list[SkillMetadata]
 
-**Token 消耗：** 每个 skill 约 30-50 tokens
+创建 Agent 时:
+  inject_skills(base_instructions, skills)
+    → 添加 <skills_instructions> 指导 Agent 如何使用 skills
+    → 添加 <available_skills> XML 列出所有可用 skills
+    → 返回增强后的 instructions
 
-### Level 2: Full Instructions Loading
+Agent 运行时:
+  Agent 分析用户请求
+    → 判断是否需要某个 skill
+    → 使用 read_file(<location>/SKILL.md) 加载完整内容
+    → 遵循 skill 指令完成任务
+    → 可选：使用 read_file 访问 skill 目录下的其他资源
+```
 
-**触发时机：** 用户输入语义匹配 skill description
+## 注入格式
 
-**加载内容：**
-- 完整的 SKILL.md markdown 内容
-- 注入到 agent instructions
+### Skills Instructions
 
-**实现：**
-- 使用简单的关键词匹配或语义相似度
-- 动态扩展 agent instructions
-- 缓存已加载的 skills
+```xml
+<skills_instructions>
+You have access to specialized skills that provide domain expertise and detailed workflows.
 
-**Token 消耗：** 每个 skill 最多 5000 tokens
+## What are Skills?
+Skills are instruction sets located in directories containing a SKILL.md file.
+Each skill provides step-by-step guidance for specific tasks.
 
-### Level 3: Resources Loading
+## How to Use Skills
+1. Review <available_skills> below to find skills matching the user's task
+2. When a skill is relevant, use read_file to load `<location>/SKILL.md`
+3. Follow the skill's instructions carefully to complete the task
+4. Skills may have additional resources in subdirectories:
+   - references/ - documentation and guides
+   - scripts/ - executable code
+   - assets/ - templates and static files
 
-**触发时机：** Agent 执行过程中按需加载
+## Important
+- Only load a skill when it's clearly relevant to the current task
+- Read the full SKILL.md before starting the task
+- You can access any file within the skill's directory using read_file
+</skills_instructions>
+```
 
-**加载内容：**
-- reference.md
-- examples.md
-- 其他支持文件
+### Available Skills XML
 
-**实现：**
-- 作为工具结果返回
-- 或作为额外上下文注入
+```xml
+<available_skills>
+  <skill>
+    <name>file-analyzer</name>
+    <description>分析文件内容、统计信息、代码质量</description>
+    <location>.demo-cli/skills/file-analyzer</location>
+  </skill>
+  <skill>
+    <name>code-reviewer</name>
+    <description>审查代码质量、检查规范、提供改进建议</description>
+    <location>.demo-cli/skills/code-reviewer</location>
+  </skill>
+</available_skills>
+```
 
 ## 实现组件
 
-### 1. `skills/scanner.py`
+### SkillScanner (`scanner.py`)
 
 ```python
-class SkillScanner:
-    """扫描和发现 skills"""
+@dataclass
+class SkillMetadata:
+    name: str
+    description: str
+    skill_path: Path
+    version: Optional[str] = None
+    allowed_tools: Optional[list[str]] = None
+    model: Optional[str] = None
+    license: Optional[str] = None
+    compatibility: Optional[str] = None
+    metadata: Optional[dict[str, str]] = None
 
-    def scan_skills_directory(self, path: str) -> list[SkillMetadata]:
+class SkillScanner:
+    def scan_skills_directory(self) -> list[SkillMetadata]:
         """扫描 skills 目录，返回元数据列表"""
 
-    def parse_skill_metadata(self, skill_md: str) -> SkillMetadata:
+    def parse_skill_metadata(self, skill_md_path: Path) -> Optional[SkillMetadata]:
         """解析 SKILL.md 的 frontmatter"""
 ```
 
-### 2. `skills/loader.py`
+### inject_skills (`injector.py`)
 
 ```python
-class SkillLoader:
-    """加载 skill 完整内容"""
-
-    def load_skill_instructions(self, skill_name: str) -> str:
-        """加载完整的 SKILL.md 内容"""
-
-    def load_skill_resource(self, skill_name: str, resource: str) -> str:
-        """加载 skill 的支持文件"""
+def inject_skills(base_instructions: str, skills: list[SkillMetadata]) -> str:
+    """将 skills 信息注入到 agent instructions"""
 ```
 
-### 3. `skills/injector.py`
+### SkillValidator (`validator.py`)
 
 ```python
-class SkillInjector:
-    """将 skills 注入到 agent"""
+class SkillValidator:
+    def validate_skill(self, skill_path: Path) -> ValidationResult:
+        """验证 skill 格式是否符合规范"""
 
-    def inject_metadata(self, agent_instructions: str, skills: list[SkillMetadata]) -> str:
-        """在 agent instructions 中注入 skills 元数据"""
-
-    def inject_full_skill(self, agent_instructions: str, skill_content: str) -> str:
-        """注入完整的 skill 指令"""
+    def validate_all_skills(self, skills_dir: Path) -> list[ValidationResult]:
+        """验证目录下所有 skills"""
 ```
 
-### 4. `skills/matcher.py`
+## 与旧架构对比
 
-```python
-class SkillMatcher:
-    """匹配用户输入和 skills"""
+### 旧架构（已移除）
 
-    def match_skills(self, user_input: str, skills: list[SkillMetadata]) -> list[str]:
-        """返回匹配的 skill names"""
-```
+- `SkillMatcher`: 基于关键词匹配用户输入
+- `SkillLoader`: 显式加载 skill 内容
+- 三级渐进式加载（Level 1/2/3）
+- 系统决定何时加载哪个 skill
 
-## 集成流程
+### 新架构
 
-### 启动时（Level 1）
-
-```python
-# cli/app.py
-def __init__(self):
-    # ... 现有代码 ...
-    self.skill_scanner = SkillScanner()  # 默认扫描 .demo-cli/skills/
-    self.skill_loader = SkillLoader()
-    self.skills_metadata = self.skill_scanner.scan_skills_directory()
-```
-
-### 处理用户输入时（Level 2）
-
-```python
-async def _handle_chat(self, user_input: str) -> None:
-    # 匹配相关 skills
-    matched_skills = self.skill_matcher.match_skills(user_input, self.skills_metadata)
-
-    # 加载匹配的 skills
-    skill_instructions = []
-    for skill_name in matched_skills:
-        content = self.skill_loader.load_skill_instructions(skill_name)
-        skill_instructions.append(content)
-
-    # 创建增强的 agent
-    agent = create_assistant(extra_skills=skill_instructions)
-
-    # ... 现有代码 ...
-```
+- Agent 自主决定加载时机
+- 使用文件读取工具直接访问 skill 内容
+- 更简洁的代码结构
+- 更灵活的加载策略
 
 ## 优势
 
-1. **可扩展性：** 支持无限数量的 skills，启动开销固定
-2. **标准兼容：** 遵循开放的 Agent Skills 标准
-3. **渐进式：** 只在需要时加载完整内容
-4. **灵活性：** 支持项目级和用户级 skills
-5. **向后兼容：** 不影响现有功能
+1. **简洁性**：减少约 500+ 行代码
+2. **灵活性**：Agent 自主决策，更智能
+3. **标准兼容**：完全遵循 Agent Skills 规范
+4. **可维护性**：组件职责单一，易于理解
+5. **可扩展性**：支持任意数量的 skills
 
-## 测试计划
+## 测试
 
-1. 创建示例 skills（文件分析、代码审查）
-2. 测试元数据加载性能
-3. 测试匹配准确性
-4. 测试完整 instructions 注入
-5. 端到端集成测试
+```bash
+# 运行 skills 测试
+pytest tests/test_skills.py -v
+```
+
+测试覆盖：
+- SkillScanner 发现和解析
+- SkillMetadata 数据结构
+- inject_skills() 注入格式
+- SkillValidator 验证逻辑
 
 ## 参考资料
 
-- [Agent Skills 官方文档](https://code.claude.com/docs/en/skills)
 - [Agent Skills 开放标准](https://agentskills.io)
-- [Claude Skills Deep Dive](https://leehanchung.github.io/blogs/2025/10/26/claude-skills-deep-dive/)
-- [Anthropic Engineering - Agent Skills](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills)
+- [Agent Skills 规范](https://agentskills.io/specification)
+- [Agent Skills 集成指南](https://agentskills.io/integrate-skills)

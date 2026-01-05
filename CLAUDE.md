@@ -53,9 +53,8 @@ demo-cli/
 │   └── skills/                # Skills system (NEW)
 │       ├── __init__.py        # Exports all skill components
 │       ├── scanner.py         # Skill discovery and metadata parsing
-│       ├── loader.py          # Skill content loading
-│       ├── matcher.py         # User input matching
-│       └── injector.py        # Instruction injection
+│       ├── injector.py        # Skills injection into instructions
+│       └── validator.py       # Skill format validation
 ├── sessions/                   # Session management
 │   ├── __init__.py
 │   ├── manager.py             # SessionManager class for persistence
@@ -88,33 +87,23 @@ The codebase follows a refined separation of concerns:
 - **Business Logic** (`tools/`): Core functionality (file operations)
 - **Persistence** (`sessions/`): State management and data storage
 
-### 2. Skills System - Progressive Loading
+### 2. Skills System - On-Demand Loading
 
-**Three-Level Loading Architecture:**
+Based on [Agent Skills open standard](https://agentskills.io), skills are loaded on-demand by the agent.
 
-**Level 1: Metadata Loading (~100 tokens total)**
-- Triggered: Application startup
-- Loads: Skill names and descriptions from YAML frontmatter
-- Purpose: Lightweight awareness of available skills
+**How it works:**
 
-**Level 2: Full Instructions Loading (up to 5000 tokens per skill)**
-- Triggered: User input semantically matches skill description
-- Loads: Complete SKILL.md markdown content
-- Purpose: Inject detailed instructions when relevant
-
-**Level 3: Resources Loading (future enhancement)**
-- Triggered: Agent requests during execution
-- Loads: Supporting files (examples.md, reference.md)
-- Purpose: On-demand deep knowledge
+1. **Startup**: Scan `.demo-cli/skills/` directory, load metadata (name, description, path)
+2. **Injection**: Add `<available_skills>` XML to system prompt with skill info
+3. **On-demand**: Agent uses `read_file` to load `SKILL.md` when relevant to user request
 
 **Components:**
 ```python
-from extensions.skills import SkillScanner, SkillLoader, SkillMatcher, SkillInjector
+from extensions.skills import SkillScanner, inject_skills, SkillValidator
 
-scanner = SkillScanner()  # Discover skills
-loader = SkillLoader()    # Load skill content
-matcher = SkillMatcher()  # Match user input
-injector = SkillInjector() # Inject into instructions
+scanner = SkillScanner()           # Discover skills
+skills = scanner.scan_skills_directory()
+enhanced = inject_skills(base, skills)  # Inject into instructions
 ```
 
 ### 3. Context Management with Compression
@@ -281,8 +270,8 @@ runner = AgentRunner(
 Skills are modular instruction sets that enhance the agent's capabilities for specific tasks. Based on the [Agent Skills open standard](https://agentskills.io), skills are:
 
 - **Discoverable**: Automatically scanned from `.demo-cli/skills/` directory
-- **Context-aware**: Activated when user input matches skill descriptions
-- **Progressive**: Loaded in stages to minimize token usage
+- **On-demand**: Agent loads skill content using file tools when relevant
+- **Standard-compliant**: Uses XML format as per Agent Skills specification
 
 ### Skill Definition Format
 
@@ -294,7 +283,7 @@ name: file-analyzer
 version: 1.0.0
 description: 当需要分析文件内容、统计信息或评估代码质量时使用此skill。
 allowed-tools: [read_file, list_directory]
-model: deepseek-chat
+license: MIT
 ---
 
 # File Analyzer Skill
@@ -312,44 +301,39 @@ model: deepseek-chat
 3. 生成报告
 ```
 
+### Skill Directory Structure
+
+```
+your-skill/
+├── SKILL.md           # Required: skill definition
+├── references/        # Optional: documentation
+├── scripts/           # Optional: executable code
+└── assets/            # Optional: templates and static files
+```
+
 ### Creating a New Skill
 
 1. Create directory: `.demo-cli/skills/your-skill-name/`
 2. Create `SKILL.md` with YAML frontmatter and instructions
-3. (Optional) Add `examples.md`, `reference.md`
+3. (Optional) Add resource subdirectories (references/, scripts/, assets/)
 4. Restart demo-cli - skill loads automatically
-
-### Skill Matching
-
-Skills are matched using keyword-based matching on user input:
-
-```python
-from extensions.skills import SkillMatcher
-
-matcher = SkillMatcher()
-matched = matcher.match_skills(user_input, available_skills)
-```
-
-**Matching algorithm:**
-- Extracts keywords from skill description
-- Checks if any keywords appear in user input
-- Returns matched skills for activation
 
 ### Skills Lifecycle
 
 ```
 App startup → SkillScanner.scan_skills_directory()
-  → Load Level 1 metadata for all skills
-  → Store in AgentRunner
+  → Parse YAML frontmatter from each SKILL.md
+  → Return list[SkillMetadata] with name, description, path
 
-User input → SkillMatcher.match_skills()
-  → Check user input against skill descriptions
-  → Return matched skills
+Agent creation → inject_skills(base_instructions, skills)
+  → Add <skills_instructions> guiding on-demand loading
+  → Add <available_skills> XML with skill info
+  → Return enhanced instructions
 
-Agent creation → SkillLoader.load_skill_instructions()
-  → Load Level 2 full instructions
-  → SkillInjector.inject_multiple_skills()
-  → Create agent with enhanced instructions
+Agent runtime → Agent analyzes user request
+  → Decides if a skill is relevant
+  → Uses read_file(<location>/SKILL.md) to load content
+  → Follows skill instructions to complete task
 ```
 
 ## Development Workflows
@@ -804,8 +788,9 @@ def new_tool(param: str) -> str:
 ---
 name: skill-name
 version: 1.0.0
-description: 当用户需要XXX时使用此skill。关键词：XXX、YYY
+description: 当用户需要XXX时使用此skill。清晰描述skill的用途。
 allowed-tools: [read_file, write_file]
+license: MIT
 ---
 
 # Skill Instructions
@@ -813,8 +798,8 @@ allowed-tools: [read_file, write_file]
 详细步骤...
 ```
 
-3. Restart app - skill loads automatically
-4. Test with input matching skill description keywords
+3. (Optional) Add resource subdirectories: `references/`, `scripts/`, `assets/`
+4. Restart app - skill loads automatically
 
 ### Adding a New Slash Command
 
@@ -1146,14 +1131,15 @@ The `core/` layer was introduced to:
 - Support future features (different UIs, API server)
 - Centralize context and compression logic
 
-### Why Progressive Skills Loading?
+### Why On-Demand Skills Loading?
 
-Three-level loading minimizes token usage:
-- Level 1 (metadata): Always loaded, minimal cost (~100 tokens total)
-- Level 2 (instructions): Only when relevant (up to 5000 tokens per skill)
-- Level 3 (resources): Future enhancement for on-demand loading
+The simplified architecture where agent loads skills using file tools:
+- **Simplicity**: No SkillMatcher/SkillLoader components needed
+- **Flexibility**: Agent decides when to load, not the system
+- **Standard-compliant**: Follows Agent Skills specification
+- **Token-efficient**: Only metadata in prompt, full content on-demand
 
-This allows supporting many skills without context window bloat.
+This allows supporting many skills while keeping the codebase minimal.
 
 ### Why Unified ContextManager?
 
@@ -1181,8 +1167,8 @@ Centralized registry enables:
 5. **Syntax Highlighting**: For code in agent responses
 6. **Token Usage Tracking**: Display API costs per session
 7. **Session Search**: Search across past conversations
-8. **Skills Level 3**: Auto-load resource files (examples, references)
-9. **Smart Skill Matching**: Use embeddings for semantic matching
+8. **Skill Validation CLI**: Command to validate skill format
+9. **Skill Templates**: Generate skill boilerplate
 10. **Skill Dependencies**: Skills can depend on other skills
 
 ### Extensibility Points
@@ -1221,8 +1207,8 @@ The architecture supports easy extension:
 
 **Skills not loading:**
 - Check `.demo-cli/skills/` directory exists
-- Verify SKILL.md has valid YAML frontmatter
-- Check skill description includes relevant keywords
+- Verify SKILL.md has valid YAML frontmatter (name, description required)
+- Run skill validator: `from extensions.skills import validate_skill`
 - Restart app after adding new skills
 
 **Context compression not triggering:**
@@ -1269,9 +1255,8 @@ When working on this codebase:
 - Compression: `sessions/compression.py`
 - MCP manager: `extensions/mcp/manager.py`
 - Skills scanner: `extensions/skills/scanner.py`
-- Skills loader: `extensions/skills/loader.py`
-- Skills matcher: `extensions/skills/matcher.py`
 - Skills injector: `extensions/skills/injector.py`
+- Skills validator: `extensions/skills/validator.py`
 - MCP config: `demo.mcp.json` (optional)
 - Skills dir: `.demo-cli/skills/`
 - Config: `pyproject.toml`
@@ -1304,7 +1289,7 @@ from demo_agents.summarizer import create_summarizer
 # Extensions
 from extensions.mcp import MCPManager
 from extensions.skills import (
-    SkillScanner, SkillLoader, SkillMatcher, SkillInjector
+    SkillScanner, SkillMetadata, inject_skills, SkillValidator
 )
 
 # Tools and sessions
@@ -1318,15 +1303,12 @@ from cli.commands import registry, CommandContext
 
 ---
 
-**Document Version**: 2.0
-**Last Updated**: 2026-01-04
+**Document Version**: 2.1
+**Last Updated**: 2026-01-05
 **Maintainer**: Demo CLI Project
 **Recent Changes**:
-- Documented modular architecture refactor (core/ layer)
-- Added comprehensive Skills system documentation
-- Documented context compression with summarizer agent
-- Updated directory structure (cli_agents → demo_agents, mcp_support → extensions/mcp)
-- Added tool registry pattern
-- Added configuration management system
-- Added local tracing support
-- Updated all file paths and import examples
+- Updated Skills system to on-demand loading architecture
+- Removed SkillMatcher and SkillLoader (agent loads via file tools)
+- Added SkillValidator for skill format validation
+- Aligned with Agent Skills specification (agentskills.io)
+- Updated all skills-related documentation and examples
