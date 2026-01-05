@@ -5,10 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from skills.scanner import SkillScanner, SkillMetadata
-from skills.loader import SkillLoader, LRUCache
-from skills.matcher import SkillMatcher, _tokenize, _is_cjk_char
-from skills.injector import SkillInjector
+from extensions.skills.scanner import SkillScanner, SkillMetadata
+from extensions.skills.loader import SkillLoader, LRUCache
+from extensions.skills.matcher import SkillMatcher, _tokenize, _is_cjk_char
+from extensions.skills.injector import SkillInjector
+from extensions.skills.validator import SkillValidator, ValidationResult, validate_skill
 
 
 class TestLRUCache:
@@ -269,7 +270,7 @@ Step 2: Do that
 
 
 class TestSkillInjector:
-    """Tests for SkillInjector."""
+    """Tests for SkillInjector with XML format."""
 
     def setup_method(self):
         self.injector = SkillInjector()
@@ -281,31 +282,40 @@ class TestSkillInjector:
             version="1.0.0",
         )
 
-    def test_inject_metadata_summary(self):
+    def test_inject_metadata_summary_xml_format(self):
+        """Test that metadata is injected in XML format."""
         skills = [self.skill]
         result = self.injector.inject_metadata_summary(self.base_instructions, skills)
 
         assert self.base_instructions in result
-        assert "Available Skills" in result
-        assert "test-skill" in result
+        assert "<available_skills>" in result
+        assert "</available_skills>" in result
+        assert "<skill>" in result
+        assert "<name>test-skill</name>" in result
+        assert "<description>A test skill</description>" in result
+        assert "<location>" in result
+        assert "<skills_instructions>" in result
 
     def test_inject_empty_skills(self):
         result = self.injector.inject_metadata_summary(self.base_instructions, [])
         assert result == self.base_instructions
 
-    def test_inject_full_skill(self):
+    def test_inject_full_skill_xml_format(self):
+        """Test that full skill is injected in XML format."""
         skill_content = "# Test Skill\n\nDo the thing."
         result = self.injector.inject_full_skill(
             self.base_instructions, self.skill, skill_content
         )
 
         assert self.base_instructions in result
-        assert "Active Skill: test-skill" in result
+        assert '<skill name="test-skill">' in result
+        assert "<instructions>" in result
         assert "Do the thing" in result
-        assert "Skill Resources Directory" in result
-        assert str(self.skill.skill_path) in result
+        assert "</instructions>" in result
+        assert "</skill>" in result
 
-    def test_inject_multiple_skills(self):
+    def test_inject_multiple_skills_xml_format(self):
+        """Test that multiple skills are wrapped in active_skills tag."""
         skill2 = SkillMetadata(
             name="another-skill",
             description="Another skill",
@@ -320,10 +330,349 @@ class TestSkillInjector:
             self.base_instructions, skills_with_content
         )
 
-        assert "Active Skills" in result
-        assert "test-skill" in result
-        assert "another-skill" in result
+        assert "<active_skills>" in result
+        assert "</active_skills>" in result
+        assert '<skill name="test-skill">' in result
+        assert '<skill name="another-skill">' in result
         assert "Content 1" in result
         assert "Content 2" in result
-        assert "Skill Resources Directory" in result
-        assert str(self.skill.skill_path) in result
+
+
+class TestSkillMetadataXML:
+    """Tests for SkillMetadata XML output."""
+
+    def test_to_xml(self):
+        skill = SkillMetadata(
+            name="test-skill",
+            description="Test description",
+            skill_path=Path("/tmp/test-skill"),
+        )
+        xml = skill.to_xml()
+
+        assert "<skill>" in xml
+        assert "<name>test-skill</name>" in xml
+        assert "<description>Test description</description>" in xml
+        assert "<location>/tmp/test-skill</location>" in xml
+        assert "</skill>" in xml
+
+    def test_get_directories(self):
+        skill = SkillMetadata(
+            name="test-skill",
+            description="Test",
+            skill_path=Path("/tmp/test-skill"),
+        )
+
+        assert skill.get_references_dir() == Path("/tmp/test-skill/references")
+        assert skill.get_scripts_dir() == Path("/tmp/test-skill/scripts")
+        assert skill.get_assets_dir() == Path("/tmp/test-skill/assets")
+
+
+class TestSkillLoaderDirectories:
+    """Tests for SkillLoader with spec-compliant directories."""
+
+    def test_load_resource_from_references_dir(self):
+        """Test loading resource from references/ directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "test-skill"
+            skill_dir.mkdir()
+            refs_dir = skill_dir / "references"
+            refs_dir.mkdir()
+            ref_file = refs_dir / "REFERENCE.md"
+            ref_file.write_text("# Reference Content")
+
+            metadata = SkillMetadata(
+                name="test-skill",
+                description="Test",
+                skill_path=skill_dir,
+            )
+
+            loader = SkillLoader()
+            content = loader.load_skill_resource(metadata, "REFERENCE.md")
+
+            assert content is not None
+            assert "Reference Content" in content
+
+    def test_load_script(self):
+        """Test loading script from scripts/ directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "test-skill"
+            skill_dir.mkdir()
+            scripts_dir = skill_dir / "scripts"
+            scripts_dir.mkdir()
+            script_file = scripts_dir / "analyze.py"
+            script_file.write_text("print('hello')")
+
+            metadata = SkillMetadata(
+                name="test-skill",
+                description="Test",
+                skill_path=skill_dir,
+            )
+
+            loader = SkillLoader()
+            content = loader.load_script(metadata, "analyze.py")
+
+            assert content is not None
+            assert "print('hello')" in content
+
+    def test_list_resources(self):
+        """Test listing all available resources."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "test-skill"
+            skill_dir.mkdir()
+
+            # Create directories
+            (skill_dir / "references").mkdir()
+            (skill_dir / "scripts").mkdir()
+            (skill_dir / "assets").mkdir()
+
+            # Create files
+            (skill_dir / "references" / "REFERENCE.md").write_text("ref")
+            (skill_dir / "scripts" / "analyze.py").write_text("script")
+            (skill_dir / "assets" / "template.txt").write_text("asset")
+            (skill_dir / "examples.md").write_text("legacy")
+
+            metadata = SkillMetadata(
+                name="test-skill",
+                description="Test",
+                skill_path=skill_dir,
+            )
+
+            loader = SkillLoader()
+            resources = loader.list_resources(metadata)
+
+            assert "REFERENCE.md" in resources["references"]
+            assert "analyze.py" in resources["scripts"]
+            assert "template.txt" in resources["assets"]
+            assert "examples.md" in resources["legacy"]
+
+
+class TestSkillValidator:
+    """Tests for SkillValidator."""
+
+    def test_validate_valid_skill(self):
+        """Test validating a fully valid skill."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "test-skill"
+            skill_dir.mkdir()
+            skill_md = skill_dir / "SKILL.md"
+            skill_md.write_text(
+                """---
+name: test-skill
+description: A test skill for unit testing with keywords for discovery
+---
+
+# Test Skill Instructions
+
+This is a test skill with proper instructions.
+"""
+            )
+
+            result = validate_skill(skill_dir)
+
+            assert result.valid is True
+            assert len(result.errors) == 0
+
+    def test_validate_missing_skill_md(self):
+        """Test validation fails when SKILL.md is missing."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "test-skill"
+            skill_dir.mkdir()
+
+            result = validate_skill(skill_dir)
+
+            assert result.valid is False
+            assert any("SKILL.md" in e for e in result.errors)
+
+    def test_validate_missing_name(self):
+        """Test validation fails when name is missing."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "test-skill"
+            skill_dir.mkdir()
+            skill_md = skill_dir / "SKILL.md"
+            skill_md.write_text(
+                """---
+description: A test skill
+---
+
+Instructions here.
+"""
+            )
+
+            result = validate_skill(skill_dir)
+
+            assert result.valid is False
+            assert any("name" in e for e in result.errors)
+
+    def test_validate_invalid_name_format(self):
+        """Test validation fails with invalid name format."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "test-skill"
+            skill_dir.mkdir()
+            skill_md = skill_dir / "SKILL.md"
+            skill_md.write_text(
+                """---
+name: Test_Skill
+description: A test skill
+---
+
+Instructions here.
+"""
+            )
+
+            result = validate_skill(skill_dir)
+
+            assert result.valid is False
+            assert any("lowercase" in e for e in result.errors)
+
+    def test_validate_name_mismatch_warning(self):
+        """Test warning when name doesn't match directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "test-skill"
+            skill_dir.mkdir()
+            skill_md = skill_dir / "SKILL.md"
+            skill_md.write_text(
+                """---
+name: different-name
+description: A test skill for testing purposes
+---
+
+Instructions here.
+"""
+            )
+
+            result = validate_skill(skill_dir)
+
+            assert any("match" in w for w in result.warnings)
+
+    def test_validate_short_description_warning(self):
+        """Test warning for short descriptions."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "test-skill"
+            skill_dir.mkdir()
+            skill_md = skill_dir / "SKILL.md"
+            skill_md.write_text(
+                """---
+name: test-skill
+description: Short desc
+---
+
+Instructions here.
+"""
+            )
+
+            result = validate_skill(skill_dir)
+
+            assert any("keywords" in w for w in result.warnings)
+
+    def test_validate_legacy_files_warning(self):
+        """Test warning for legacy resource files in root."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "test-skill"
+            skill_dir.mkdir()
+            skill_md = skill_dir / "SKILL.md"
+            skill_md.write_text(
+                """---
+name: test-skill
+description: A test skill for testing purposes with keywords
+---
+
+Instructions here.
+"""
+            )
+            # Create legacy file
+            (skill_dir / "examples.md").write_text("examples")
+
+            result = validate_skill(skill_dir)
+
+            assert any("references/" in w for w in result.warnings)
+
+    def test_validate_all_optional_fields(self):
+        """Test validation with all optional fields."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "test-skill"
+            skill_dir.mkdir()
+            skill_md = skill_dir / "SKILL.md"
+            skill_md.write_text(
+                """---
+name: test-skill
+description: A comprehensive test skill for validation testing
+license: MIT
+compatibility: Python 3.13+, macOS/Linux
+allowed-tools: [read_file, write_file]
+metadata:
+  author: test
+  category: testing
+---
+
+# Full Instructions
+
+Complete instructions here.
+"""
+            )
+
+            result = validate_skill(skill_dir)
+
+            assert result.valid is True
+            assert len(result.errors) == 0
+
+
+class TestSkillScannerExtendedFields:
+    """Tests for SkillScanner with extended fields."""
+
+    def test_scan_skill_with_all_fields(self):
+        """Test scanning skill with all specification fields."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "test-skill"
+            skill_dir.mkdir()
+            skill_md = skill_dir / "SKILL.md"
+            skill_md.write_text(
+                """---
+name: test-skill
+version: 1.0.0
+description: A test skill
+license: MIT
+compatibility: Python 3.13+
+allowed-tools: [read_file]
+metadata:
+  author: test
+  category: testing
+---
+
+Instructions here.
+"""
+            )
+
+            scanner = SkillScanner(tmpdir)
+            skills = scanner.scan_skills_directory()
+
+            assert len(skills) == 1
+            skill = skills[0]
+            assert skill.name == "test-skill"
+            assert skill.license == "MIT"
+            assert skill.compatibility == "Python 3.13+"
+            assert skill.metadata == {"author": "test", "category": "testing"}
+
+    def test_get_skills_xml(self):
+        """Test XML generation for skills."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "test-skill"
+            skill_dir.mkdir()
+            skill_md = skill_dir / "SKILL.md"
+            skill_md.write_text(
+                """---
+name: test-skill
+description: A test skill
+---
+
+Instructions here.
+"""
+            )
+
+            scanner = SkillScanner(tmpdir)
+            skills = scanner.scan_skills_directory()
+            xml = scanner.get_skills_xml(skills)
+
+            assert "<available_skills>" in xml
+            assert "</available_skills>" in xml
+            assert "<skill>" in xml
+            assert "<name>test-skill</name>" in xml

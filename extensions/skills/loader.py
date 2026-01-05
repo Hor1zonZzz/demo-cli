@@ -104,20 +104,30 @@ class SkillLoader:
     ) -> Optional[str]:
         """Load a skill resource file for Level 3 loading.
 
+        Follows Agent Skills specification by checking:
+        1. references/ directory first (spec-compliant)
+        2. Skill root directory (legacy support)
+
         Args:
             skill_metadata: SkillMetadata object.
-            resource_name: Name of the resource file (e.g., 'reference.md', 'examples.md').
+            resource_name: Name of the resource file (e.g., 'REFERENCE.md', 'examples.md').
 
         Returns:
             Resource file content or None if not found.
         """
-        resource_path = skill_metadata.skill_path / resource_name
-
         # Check cache
         cache_key = f"resource:{skill_metadata.name}:{resource_name}"
         cached = self._cache.get(cache_key)
         if cached is not None:
             return cached
+
+        # Try references/ directory first (spec-compliant)
+        refs_dir = skill_metadata.get_references_dir()
+        resource_path = refs_dir / resource_name
+
+        # Fall back to skill root (legacy support)
+        if not resource_path.exists():
+            resource_path = skill_metadata.skill_path / resource_name
 
         if not resource_path.exists():
             return None
@@ -133,6 +143,77 @@ class SkillLoader:
         except Exception as e:
             logger.error(f"Error loading resource {resource_name} for {skill_metadata.name}: {e}")
             return None
+
+    def load_script(
+        self, skill_metadata: SkillMetadata, script_name: str
+    ) -> Optional[str]:
+        """Load a script file from the scripts/ directory.
+
+        Args:
+            skill_metadata: SkillMetadata object.
+            script_name: Name of the script file (e.g., 'analyze.py', 'process.sh').
+
+        Returns:
+            Script file content or None if not found.
+        """
+        cache_key = f"script:{skill_metadata.name}:{script_name}"
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        scripts_dir = skill_metadata.get_scripts_dir()
+        script_path = scripts_dir / script_name
+
+        if not script_path.exists():
+            return None
+
+        try:
+            with open(script_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            self._cache.set(cache_key, content)
+            return content
+
+        except Exception as e:
+            logger.error(f"Error loading script {script_name} for {skill_metadata.name}: {e}")
+            return None
+
+    def list_resources(self, skill_metadata: SkillMetadata) -> dict[str, list[str]]:
+        """List all available resources for a skill.
+
+        Returns:
+            Dictionary with keys 'references', 'scripts', 'assets', 'legacy'
+            containing lists of file names.
+        """
+        result = {
+            "references": [],
+            "scripts": [],
+            "assets": [],
+            "legacy": [],
+        }
+
+        # Check references/
+        refs_dir = skill_metadata.get_references_dir()
+        if refs_dir.exists():
+            result["references"] = [f.name for f in refs_dir.iterdir() if f.is_file()]
+
+        # Check scripts/
+        scripts_dir = skill_metadata.get_scripts_dir()
+        if scripts_dir.exists():
+            result["scripts"] = [f.name for f in scripts_dir.iterdir() if f.is_file()]
+
+        # Check assets/
+        assets_dir = skill_metadata.get_assets_dir()
+        if assets_dir.exists():
+            result["assets"] = [f.name for f in assets_dir.iterdir() if f.is_file()]
+
+        # Check legacy files in skill root
+        skill_path = skill_metadata.skill_path
+        for legacy_file in ["examples.md", "reference.md", "REFERENCE.md"]:
+            if (skill_path / legacy_file).exists():
+                result["legacy"].append(legacy_file)
+
+        return result
 
     def clear_cache(self) -> None:
         """Clear the loader cache."""
