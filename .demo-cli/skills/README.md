@@ -1,6 +1,12 @@
 # Demo-CLI Skills 目录
 
-这个目录包含 demo-cli 的 Agent Skills。
+这个目录包含 demo-cli 的 Agent Skills，遵循 [Agent Skills 开放标准](https://agentskills.io)。
+
+## 工作原理
+
+1. **启动时**：系统扫描此目录，加载每个 skill 的元数据（名称、描述、路径）
+2. **注入提示**：`<available_skills>` XML 被注入到 Agent 的系统提示中
+3. **按需加载**：Agent 根据用户请求，使用 `read_file` 工具加载相关 skill 的完整内容
 
 ## 可用 Skills
 
@@ -14,8 +20,6 @@
 - 评估代码质量
 - 识别文件模式和问题
 
-**触发关键词**: 分析文件、检查文件、统计、文件信息
-
 ### 2. code-reviewer
 
 **描述**: 代码审查专家
@@ -26,34 +30,40 @@
 - 识别潜在问题和bug
 - 提供改进建议
 
-**触发关键词**: 审查代码、代码质量、代码规范、改进建议
-
 ## 如何添加新 Skill
 
 1. 在此目录创建新文件夹：`.demo-cli/skills/your-skill-name/`
-2. 创建 `SKILL.md` 文件，包含：
-   - YAML frontmatter（name, version, description）
-   - 详细的 instructions
-3. （可选）添加 `examples.md`、`reference.md` 等支持文件
-4. 重启 demo-cli，新 skill 会自动加载
+2. 创建 `SKILL.md` 文件，包含 YAML frontmatter 和详细指令
+3. （可选）创建资源子目录：
+   - `references/` - 参考文档
+   - `scripts/` - 可执行脚本
+   - `assets/` - 模板和静态文件
+4. 重启 demo-cli，新 skill 会自动发现
 
-## Skill 编写最佳实践
+## Skill 目录结构
 
-### 好的描述示例
-
-```yaml
-description: 当用户需要分析Python代码性能、识别瓶颈、或优化算法复杂度时使用此skill。关注时间复杂度、空间复杂度和性能优化建议。
+```
+your-skill-name/
+├── SKILL.md           # 必需：skill 定义和指令
+├── references/        # 可选：参考文档
+│   └── guide.md
+├── scripts/           # 可选：可执行脚本
+│   └── helper.py
+└── assets/            # 可选：模板和静态文件
+    └── template.txt
 ```
 
-### 不好的描述示例
-
-```yaml
-description: 代码分析工具  # 太笼统，缺少触发关键词
-```
-
-### Instructions 结构建议
+## SKILL.md 格式
 
 ```markdown
+---
+name: your-skill-name
+version: 1.0.0
+description: 清晰描述此 skill 的用途和适用场景。
+allowed-tools: [read_file, write_file]  # 可选
+license: MIT                             # 可选
+---
+
 # Skill Name
 
 简短介绍这个 skill 的作用。
@@ -79,17 +89,29 @@ description: 代码分析工具  # 太笼统，缺少触发关键词
 - 质量标准
 ```
 
-## 调试 Skills
+## Skill 编写最佳实践
 
-如果 skill 没有被激活：
+### 好的描述示例
 
-1. 检查描述是否包含相关关键词
-2. 确保 SKILL.md 格式正确（YAML frontmatter）
-3. 使用更具体的用户请求
-4. 检查 skill 名称和目录结构
+```yaml
+description: 当用户需要分析Python代码性能、识别瓶颈、或优化算法复杂度时使用此skill。
+```
+
+### 不好的描述示例
+
+```yaml
+description: 代码分析工具  # 太笼统
+```
+
+### 指令编写建议
+
+- 使用清晰的步骤说明
+- 提供具体的输出格式
+- 说明边界情况和注意事项
+- 包含实际示例（可放在 references/ 中）
 
 ## 了解更多
 
 - [SKILLS_DESIGN.md](../../docs/SKILLS_DESIGN.md) - 系统设计文档
 - [Agent Skills 标准](https://agentskills.io) - 开放标准规范
-- [Claude Code Skills](https://code.claude.com/docs/en/skills) - 官方文档
+- [Agent Skills 集成指南](https://agentskills.io/integrate-skills) - 集成方法

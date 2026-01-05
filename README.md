@@ -96,19 +96,21 @@ The agent can perform file operations in your current working directory:
 - `delete_file` - Delete files
 - `file_exists` - Check if file exists
 
-## Skills System (Progressive Loading)
+## Skills System (On-Demand Loading)
 
-demo-cli 支持 Agent Skills 开放标准，实现了三级渐进式加载架构，可以扩展 AI 助手的能力。
+demo-cli 支持 [Agent Skills 开放标准](https://agentskills.io)，AI 助手可以按需加载专业技能来完成特定任务。
 
 ### 什么是 Skills？
 
-Skills 是专门的能力模块，可以教会 AI 助手执行特定任务。与传统方法不同，Skills 采用渐进式加载：
+Skills 是包含专业指令的目录，每个 skill 包含一个 `SKILL.md` 文件，定义了执行特定任务的详细步骤。
 
-- **Level 1（元数据）**：启动时只加载 skill 名称和描述（~30-50 tokens/skill）
-- **Level 2（完整指令）**：当用户请求匹配时才加载完整 instructions（~5000 tokens/skill）
-- **Level 3（资源文件）**：按需加载参考文档和示例
+**工作原理：**
 
-这种设计允许你安装无限数量的 skills，而不会影响启动性能。
+1. **启动时**：扫描 `.demo-cli/skills/` 目录，加载 skill 元数据（名称、描述、路径）
+2. **注入提示**：将 `<available_skills>` XML 注入到系统提示中
+3. **按需加载**：Agent 根据用户请求，使用 `read_file` 工具加载相关 skill 的完整内容
+
+这种设计让 Agent 自主决定何时加载哪个 skill，最大化灵活性并最小化 token 消耗。
 
 ### 创建 Skill
 
@@ -117,7 +119,10 @@ Skills 是专门的能力模块，可以教会 AI 助手执行特定任务。与
 ```
 .demo-cli/skills/
 └── my-skill/
-    └── SKILL.md
+    ├── SKILL.md           # 必需：skill 定义和指令
+    ├── references/        # 可选：参考文档
+    ├── scripts/           # 可选：可执行脚本
+    └── assets/            # 可选：模板和静态文件
 ```
 
 SKILL.md 格式：
@@ -126,8 +131,9 @@ SKILL.md 格式：
 ---
 name: my-skill
 version: 1.0.0
-description: 当用户需要XXX时使用此skill。描述要清晰具体，包含触发关键词。
-allowed-tools: [read_file, write_file]  # 可选：限制可用工具
+description: 当用户需要XXX时使用此skill。描述应清晰说明 skill 的用途。
+allowed-tools: [read_file, write_file]  # 可选
+license: MIT                             # 可选
 ---
 
 # Skill Instructions
@@ -149,34 +155,25 @@ demo-cli 包含两个示例 skills：
 
 ### 使用 Skills
 
-Skills 会自动激活！当你的请求匹配 skill 的描述时，系统会：
+Agent 会自动识别并加载相关 skills：
 
-1. 自动识别相关的 skills
-2. 加载完整的 skill instructions
-3. 显示激活的 skills（🔧 图标）
-4. AI 助手会遵循 skill 的专业指令
-
-**示例：**
-
-```
-> 帮我分析一下 main.py 文件
-🔧 激活 Skills: file-analyzer
-
-[AI 会使用文件分析专家模式回复...]
-```
+1. 系统提示中包含所有可用 skills 的描述和路径
+2. 当用户请求与某个 skill 相关时，Agent 使用 `read_file` 加载 `SKILL.md`
+3. Agent 遵循 skill 中的专业指令完成任务
+4. 如需要，Agent 可以访问 skill 目录下的其他资源文件
 
 ### 优势
 
-- 支持无限数量的 skills，启动开销固定
-- 遵循开放的 Agent Skills 标准（agentskills.io）
-- 渐进式加载，只在需要时消耗 tokens
-- 自动发现和激活，无需手动调用
-- 可跨 AI 平台使用（标准化格式）
+- 遵循 [Agent Skills 开放标准](https://agentskills.io)
+- Agent 自主决定加载时机，更加智能
+- 按需加载，最小化 token 消耗
+- 支持资源文件（references/, scripts/, assets/）
+- 可跨 AI 平台使用（标准化 XML 格式）
 
 ### 参考资源
 
-- [Agent Skills 官方文档](https://code.claude.com/docs/en/skills)
 - [Agent Skills 开放标准](https://agentskills.io)
+- [Agent Skills 集成指南](https://agentskills.io/integrate-skills)
 - [设计文档](docs/SKILLS_DESIGN.md)
 
 ## MCP (Model Context Protocol) Support
