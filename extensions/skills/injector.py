@@ -123,47 +123,14 @@ class SkillInjector:
         Returns:
             Formatted skill section in XML.
         """
-        # Build resource directories info
-        resources_info = self._build_resources_info(skill_metadata)
-
         lines = [
             f"<skill name=\"{skill_metadata.name}\">",
             f"<description>{skill_metadata.description}</description>",
             f"<location>{skill_metadata.skill_path}</location>",
+            "<instructions>",
+            skill_content,
+            "</instructions>",
+            "</skill>",
         ]
 
-        if resources_info:
-            lines.append(f"<resources>{resources_info}</resources>")
-
-        lines.append("<instructions>")
-        lines.append(skill_content)
-        lines.append("</instructions>")
-        lines.append("</skill>")
-
         return "\n".join(lines)
-
-    def _build_resources_info(self, skill_metadata: SkillMetadata) -> str:
-        """Build resources info string for a skill.
-
-        Follows Agent Skills specification directory structure.
-
-        Args:
-            skill_metadata: Metadata of the skill.
-
-        Returns:
-            Formatted resources info string.
-        """
-        resources = []
-
-        refs_dir = skill_metadata.get_references_dir()
-        scripts_dir = skill_metadata.get_scripts_dir()
-        assets_dir = skill_metadata.get_assets_dir()
-
-        if refs_dir.exists():
-            resources.append(f"references: {refs_dir}")
-        if scripts_dir.exists():
-            resources.append(f"scripts: {scripts_dir}")
-        if assets_dir.exists():
-            resources.append(f"assets: {assets_dir}")
-
-        return "; ".join(resources) if resources else ""

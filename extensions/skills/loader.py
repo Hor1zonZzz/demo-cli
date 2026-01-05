@@ -1,4 +1,4 @@
-"""Skill loader for Level 2 and Level 3 content loading."""
+"""Skill loader for Level 2 instructions loading."""
 
 import logging
 from collections import OrderedDict
@@ -50,7 +50,12 @@ class LRUCache:
 
 
 class SkillLoader:
-    """Loader for skill instructions and resources."""
+    """Loader for skill instructions.
+
+    Only loads SKILL.md content. Resource files (references/, scripts/, assets/)
+    are accessed by the agent directly using file reading tools, since the skill
+    path is injected into the prompt via <location> tag.
+    """
 
     def __init__(self, cache_size: int = DEFAULT_CACHE_SIZE):
         """Initialize loader.
@@ -98,106 +103,6 @@ class SkillLoader:
         except Exception as e:
             logger.error(f"Error loading skill instructions for {skill_metadata.name}: {e}")
             return ""
-
-    def load_skill_resource(
-        self, skill_metadata: SkillMetadata, resource_name: str
-    ) -> Optional[str]:
-        """Load a skill resource file from references/ directory.
-
-        Follows Agent Skills specification:
-        https://agentskills.io/specification
-
-        Args:
-            skill_metadata: SkillMetadata object.
-            resource_name: Name of the resource file (e.g., 'REFERENCE.md').
-
-        Returns:
-            Resource file content or None if not found.
-        """
-        cache_key = f"resource:{skill_metadata.name}:{resource_name}"
-        cached = self._cache.get(cache_key)
-        if cached is not None:
-            return cached
-
-        refs_dir = skill_metadata.get_references_dir()
-        resource_path = refs_dir / resource_name
-
-        if not resource_path.exists():
-            return None
-
-        try:
-            with open(resource_path, "r", encoding="utf-8") as f:
-                content = f.read()
-
-            self._cache.set(cache_key, content)
-            return content
-
-        except Exception as e:
-            logger.error(f"Error loading resource {resource_name} for {skill_metadata.name}: {e}")
-            return None
-
-    def load_script(
-        self, skill_metadata: SkillMetadata, script_name: str
-    ) -> Optional[str]:
-        """Load a script file from the scripts/ directory.
-
-        Args:
-            skill_metadata: SkillMetadata object.
-            script_name: Name of the script file (e.g., 'analyze.py', 'process.sh').
-
-        Returns:
-            Script file content or None if not found.
-        """
-        cache_key = f"script:{skill_metadata.name}:{script_name}"
-        cached = self._cache.get(cache_key)
-        if cached is not None:
-            return cached
-
-        scripts_dir = skill_metadata.get_scripts_dir()
-        script_path = scripts_dir / script_name
-
-        if not script_path.exists():
-            return None
-
-        try:
-            with open(script_path, "r", encoding="utf-8") as f:
-                content = f.read()
-
-            self._cache.set(cache_key, content)
-            return content
-
-        except Exception as e:
-            logger.error(f"Error loading script {script_name} for {skill_metadata.name}: {e}")
-            return None
-
-    def list_resources(self, skill_metadata: SkillMetadata) -> dict[str, list[str]]:
-        """List all available resources for a skill.
-
-        Follows Agent Skills specification directory structure.
-
-        Returns:
-            Dictionary with keys 'references', 'scripts', 'assets'
-            containing lists of file names.
-        """
-        result: dict[str, list[str]] = {
-            "references": [],
-            "scripts": [],
-            "assets": [],
-        }
-
-        refs_dir = skill_metadata.get_references_dir()
-        if refs_dir.exists():
-            result["references"] = [f.name for f in refs_dir.iterdir() if f.is_file()]
-
-        scripts_dir = skill_metadata.get_scripts_dir()
-        if scripts_dir.exists():
-            result["scripts"] = [f.name for f in scripts_dir.iterdir() if f.is_file()]
-
-        assets_dir = skill_metadata.get_assets_dir()
-        if assets_dir.exists():
-            result["assets"] = [f.name for f in assets_dir.iterdir() if f.is_file()]
-
-        return result
 
     def clear_cache(self) -> None:
         """Clear the loader cache."""

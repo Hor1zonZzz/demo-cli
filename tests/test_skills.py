@@ -220,38 +220,6 @@ Step 2: Do that
             assert "Step 1: Do this" in instructions
             assert "---" not in instructions  # Frontmatter should be removed
 
-    def test_load_skill_resource(self):
-        """Test loading resource from references/ directory."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            skill_dir = Path(tmpdir) / "test-skill"
-            skill_dir.mkdir()
-            refs_dir = skill_dir / "references"
-            refs_dir.mkdir()
-            examples_md = refs_dir / "examples.md"
-            examples_md.write_text("# Examples\n\nExample content here.")
-
-            metadata = SkillMetadata(
-                name="test-skill",
-                description="Test",
-                skill_path=skill_dir,
-            )
-
-            loader = SkillLoader()
-            content = loader.load_skill_resource(metadata, "examples.md")
-
-            assert content is not None
-            assert "Example content here" in content
-
-    def test_load_nonexistent_resource(self):
-        metadata = SkillMetadata(
-            name="test-skill",
-            description="Test",
-            skill_path=Path("/nonexistent"),
-        )
-        loader = SkillLoader()
-        content = loader.load_skill_resource(metadata, "nonexistent.md")
-        assert content is None
-
     def test_caching(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             skill_dir = Path(tmpdir) / "test-skill"
@@ -357,95 +325,6 @@ class TestSkillMetadataXML:
         assert "<description>Test description</description>" in xml
         assert "<location>/tmp/test-skill</location>" in xml
         assert "</skill>" in xml
-
-    def test_get_directories(self):
-        skill = SkillMetadata(
-            name="test-skill",
-            description="Test",
-            skill_path=Path("/tmp/test-skill"),
-        )
-
-        assert skill.get_references_dir() == Path("/tmp/test-skill/references")
-        assert skill.get_scripts_dir() == Path("/tmp/test-skill/scripts")
-        assert skill.get_assets_dir() == Path("/tmp/test-skill/assets")
-
-
-class TestSkillLoaderDirectories:
-    """Tests for SkillLoader with spec-compliant directories."""
-
-    def test_load_resource_from_references_dir(self):
-        """Test loading resource from references/ directory."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            skill_dir = Path(tmpdir) / "test-skill"
-            skill_dir.mkdir()
-            refs_dir = skill_dir / "references"
-            refs_dir.mkdir()
-            ref_file = refs_dir / "REFERENCE.md"
-            ref_file.write_text("# Reference Content")
-
-            metadata = SkillMetadata(
-                name="test-skill",
-                description="Test",
-                skill_path=skill_dir,
-            )
-
-            loader = SkillLoader()
-            content = loader.load_skill_resource(metadata, "REFERENCE.md")
-
-            assert content is not None
-            assert "Reference Content" in content
-
-    def test_load_script(self):
-        """Test loading script from scripts/ directory."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            skill_dir = Path(tmpdir) / "test-skill"
-            skill_dir.mkdir()
-            scripts_dir = skill_dir / "scripts"
-            scripts_dir.mkdir()
-            script_file = scripts_dir / "analyze.py"
-            script_file.write_text("print('hello')")
-
-            metadata = SkillMetadata(
-                name="test-skill",
-                description="Test",
-                skill_path=skill_dir,
-            )
-
-            loader = SkillLoader()
-            content = loader.load_script(metadata, "analyze.py")
-
-            assert content is not None
-            assert "print('hello')" in content
-
-    def test_list_resources(self):
-        """Test listing all available resources."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            skill_dir = Path(tmpdir) / "test-skill"
-            skill_dir.mkdir()
-
-            # Create directories per Agent Skills specification
-            (skill_dir / "references").mkdir()
-            (skill_dir / "scripts").mkdir()
-            (skill_dir / "assets").mkdir()
-
-            # Create files
-            (skill_dir / "references" / "REFERENCE.md").write_text("ref")
-            (skill_dir / "scripts" / "analyze.py").write_text("script")
-            (skill_dir / "assets" / "template.txt").write_text("asset")
-
-            metadata = SkillMetadata(
-                name="test-skill",
-                description="Test",
-                skill_path=skill_dir,
-            )
-
-            loader = SkillLoader()
-            resources = loader.list_resources(metadata)
-
-            assert "REFERENCE.md" in resources["references"]
-            assert "analyze.py" in resources["scripts"]
-            assert "template.txt" in resources["assets"]
-
 
 class TestSkillValidator:
     """Tests for SkillValidator."""

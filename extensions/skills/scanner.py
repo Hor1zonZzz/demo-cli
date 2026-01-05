@@ -46,21 +46,9 @@ class SkillMetadata:
             f"    <name>{self.name}</name>",
             f"    <description>{self.description}</description>",
             f"    <location>{self.skill_path}</location>",
+            "  </skill>",
         ]
-        lines.append("  </skill>")
         return "\n".join(lines)
-
-    def get_references_dir(self) -> Path:
-        """Get the references directory path."""
-        return self.skill_path / "references"
-
-    def get_scripts_dir(self) -> Path:
-        """Get the scripts directory path."""
-        return self.skill_path / "scripts"
-
-    def get_assets_dir(self) -> Path:
-        """Get the assets directory path."""
-        return self.skill_path / "assets"
 
 
 class SkillScanner:
